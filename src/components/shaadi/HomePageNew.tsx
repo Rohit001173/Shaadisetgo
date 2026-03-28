@@ -218,7 +218,7 @@ export function HomePageNew() {
         setCurrentView('vendors');
         break;
       case 'subcategory':
-        setSelectedCategory(result.category);
+        setSelectedCategory(result.category ?? null);
         setCurrentView('vendors');
         break;
       case 'vendor':

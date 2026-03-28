@@ -1,27 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateBookingStatus } from '@/lib/supabase-db';
+import { db } from '@/lib/db';
 
-// Transform snake_case booking to camelCase for frontend
+// Transform Prisma booking to frontend format
 function transformBooking(booking: any) {
   return {
     id: booking.id,
-    bookingId: booking.booking_id,
-    vendorId: booking.vendor_id,
-    vendorName: booking.vendor_name,
-    customerId: booking.customer_id,
-    customerName: booking.customer_name,
-    customerPhone: booking.customer_phone,
-    customerEmail: booking.customer_email,
-    eventDate: booking.event_date,
+    bookingId: booking.bookingId,
+    vendorId: booking.vendorId,
+    vendorName: booking.vendorName,
+    customerId: booking.customerId,
+    customerName: booking.customerName,
+    customerPhone: booking.customerPhone,
+    customerEmail: booking.customerEmail,
+    eventDate: booking.eventDate,
     city: booking.city,
-    functionType: booking.function_type,
+    functionType: booking.functionType,
     guests: booking.guests,
     timing: booking.timing,
-    specialRequest: booking.special_request,
+    specialRequest: booking.specialRequest,
     status: booking.status,
-    createdAt: booking.created_at,
-    updatedAt: booking.updated_at,
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
   };
+}
+
+// GET /api/bookings/[id] - Get booking by ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    const booking = await db.booking.findUnique({
+      where: { id }
+    });
+
+    if (!booking) {
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: transformBooking(booking),
+    });
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch booking' },
+      { status: 500 }
+    );
+  }
 }
 
 // PUT /api/bookings/[id] - Update booking status
@@ -33,7 +65,13 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const booking = await updateBookingStatus(id, body.status);
+    const booking = await db.booking.update({
+      where: { id },
+      data: {
+        status: body.status,
+        updatedAt: new Date(),
+      }
+    });
 
     return NextResponse.json({
       success: true,

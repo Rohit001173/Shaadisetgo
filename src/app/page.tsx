@@ -136,10 +136,17 @@ export default function ShaadiSetGoApp() {
     }
   };
 
+  // Check if current view is a vendor dashboard view (no bottom nav needed)
+  const isVendorView = [
+    'vendor-login', 'vendor-signup', 'vendor-dashboard', 
+    'vendor-services', 'vendor-add-service', 'vendor-edit-service',
+    'vendor-bookings', 'vendor-profile'
+  ].includes(currentView);
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50">
       {renderView()}
-      <BottomNav />
+      {!isVendorView && <BottomNav />}
     </div>
   );
 }
@@ -1364,11 +1371,11 @@ function BookingsPage() {
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <Users className="w-4 h-4 text-[#E8437A]" />
-                          <span>{booking.guestCount} guests</span>
+                          <span>{booking.guests || 'N/A'} guests</span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <Phone className="w-4 h-4 text-[#E8437A]" />
-                          <span>{booking.phone}</span>
+                          <span>{booking.customerPhone}</span>
                         </div>
                       </div>
 
@@ -1644,7 +1651,7 @@ function AdminLoginPage() {
 
 // ==================== ADMIN DASHBOARD ====================
 function AdminDashboard() {
-  const { setCurrentView, isAdminAuthenticated } = useAppStore();
+  const { setCurrentView, isAdminAuthenticated, setAdminAuthenticated } = useAppStore();
   const [stats, setStats] = useState({
     totalVendors: 0,
     totalBookings: 0,
@@ -2133,7 +2140,7 @@ function AdminBookingsPage() {
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Booked On</p>
-                          <p className="text-sm font-medium">{formatDate(booking.createdAt as string)}</p>
+                          <p className="text-sm font-medium">{formatDate(typeof booking.createdAt === 'string' ? booking.createdAt : booking.createdAt.toISOString())}</p>
                         </div>
                       </div>
                       

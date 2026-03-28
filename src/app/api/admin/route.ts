@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStats } from '@/lib/supabase-db';
+import { db } from '@/lib/db';
 
 // Simple admin login
 export async function POST(request: NextRequest) {
@@ -38,11 +38,24 @@ export async function POST(request: NextRequest) {
 // GET dashboard stats
 export async function GET(request: NextRequest) {
   try {
-    const stats = await getStats();
+    // Get counts in parallel
+    const [totalVendors, activeVendors, totalBookings, pendingBookings, confirmedBookings] = await Promise.all([
+      db.vendor.count(),
+      db.vendor.count({ where: { isActive: true } }),
+      db.booking.count(),
+      db.booking.count({ where: { status: 'pending' } }),
+      db.booking.count({ where: { status: 'confirmed' } }),
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: stats,
+      data: {
+        totalVendors,
+        activeVendors,
+        totalBookings,
+        pendingBookings,
+        confirmedBookings,
+      },
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

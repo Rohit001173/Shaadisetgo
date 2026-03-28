@@ -1,11 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-db';
+import { createClient } from '@supabase/supabase-js';
 
 // Bucket name - must match exactly in Supabase Storage
 const BUCKET_NAME = 'Vendor_image';
 
+// Create Supabase client for storage only
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Check if Supabase is configured
+const isSupabaseConfigured = supabaseUrl && serviceKey;
+
+const supabaseAdmin = isSupabaseConfigured 
+  ? createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
+
 export async function POST(request: NextRequest) {
   try {
+    // Check if Supabase is configured
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Image upload is not configured. Please set up Supabase storage.' },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 

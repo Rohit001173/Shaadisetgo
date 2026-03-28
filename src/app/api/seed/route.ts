@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+import { db } from '@/lib/db';
+import { nanoid } from 'nanoid';
 
 // Sample vendor images
 const sampleImages = {
@@ -36,234 +30,234 @@ const sampleVendors = [
   // DJ
   {
     name: 'DJ Ravi Sound',
-    owner_name: 'Ravi Kumar',
+    ownerName: 'Ravi Kumar',
     category: 'DJ',
     city: 'Patna',
     area: 'Boring Road',
     pincode: '800001',
-    price_start: 25000,
-    price_label: 'Starting from ₹25,000',
-    price_model: 'per event',
-    advance_percentage: 30,
-    max_guests: '500+',
-    extra_hour_charge: '₹5,000/hr',
-    distance_policy: 'Free within 20km',
-    phone_number: '9876543210',
+    priceStart: 25000,
+    priceLabel: 'Starting from ₹25,000',
+    priceModel: 'per event',
+    advancePercentage: 30,
+    maxGuests: '500+',
+    extraHourCharge: '₹5,000/hr',
+    distancePolicy: 'Free within 20km',
+    phoneNumber: '9876543210',
     description: 'DJ Ravi Sound - 10+ years experience in wedding entertainment. Premium sound system, LED lighting.',
     rating: 4.8,
-    reviews_count: 156,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 156,
+    isVerified: true,
+    isFeatured: true,
   },
   {
     name: 'DJ Beats Bihar',
-    owner_name: 'Amit Singh',
+    ownerName: 'Amit Singh',
     category: 'DJ',
     city: 'Patna',
     area: 'Kankarbagh',
     pincode: '800020',
-    price_start: 20000,
-    price_label: 'Starting from ₹20,000',
-    price_model: 'per event',
-    advance_percentage: 25,
-    max_guests: '400+',
-    phone_number: '9876543211',
+    priceStart: 20000,
+    priceLabel: 'Starting from ₹20,000',
+    priceModel: 'per event',
+    advancePercentage: 25,
+    maxGuests: '400+',
+    phoneNumber: '9876543211',
     description: 'Professional DJ services for weddings and parties.',
     rating: 4.6,
-    reviews_count: 98,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 98,
+    isVerified: true,
+    isFeatured: false,
   },
   {
     name: 'DJ Sound Factory',
-    owner_name: 'Vikash Yadav',
+    ownerName: 'Vikash Yadav',
     category: 'DJ',
     city: 'Varanasi',
     area: 'Cantonment',
-    price_start: 30000,
-    price_label: 'Starting from ₹30,000',
-    phone_number: '9876543212',
+    priceStart: 30000,
+    priceLabel: 'Starting from ₹30,000',
+    phoneNumber: '9876543212',
     description: 'Premium DJ services with state-of-the-art equipment.',
     rating: 4.9,
-    reviews_count: 203,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 203,
+    isVerified: true,
+    isFeatured: true,
   },
   // Catering
   {
     name: 'Royal Caterers',
-    owner_name: 'Suresh Prasad',
+    ownerName: 'Suresh Prasad',
     category: 'Catering',
     city: 'Patna',
     area: 'Gardanibagh',
-    price_start: 500,
-    price_label: '₹500 per plate',
-    price_model: 'per plate',
-    advance_percentage: 50,
-    max_guests: '2000+',
-    phone_number: '9876543220',
+    priceStart: 500,
+    priceLabel: '₹500 per plate',
+    priceModel: 'per plate',
+    advancePercentage: 50,
+    maxGuests: '2000+',
+    phoneNumber: '9876543220',
     description: 'Royal Caterers - 25+ years experience. Specialized in North Indian and Mughlai cuisine.',
     rating: 4.7,
-    reviews_count: 312,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 312,
+    isVerified: true,
+    isFeatured: true,
   },
   {
     name: 'Bihari Bhojan',
-    owner_name: 'Rajan Kumar',
+    ownerName: 'Rajan Kumar',
     category: 'Catering',
     city: 'Gaya',
     area: 'Main Road',
-    price_start: 400,
-    price_label: '₹400 per plate',
-    price_model: 'per plate',
-    phone_number: '9876543221',
+    priceStart: 400,
+    priceLabel: '₹400 per plate',
+    priceModel: 'per plate',
+    phoneNumber: '9876543221',
     description: 'Authentic Bihari cuisine with traditional flavors.',
     rating: 4.5,
-    reviews_count: 89,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 89,
+    isVerified: true,
+    isFeatured: false,
   },
   {
     name: 'Chappan Bhog Caterers',
-    owner_name: 'Mahesh Gupta',
+    ownerName: 'Mahesh Gupta',
     category: 'Catering',
     city: 'Muzaffarpur',
     area: 'Club Road',
-    price_start: 450,
-    price_label: '₹450 per plate',
-    phone_number: '9876543222',
+    priceStart: 450,
+    priceLabel: '₹450 per plate',
+    phoneNumber: '9876543222',
     description: 'Premium catering with multi-cuisine options.',
     rating: 4.6,
-    reviews_count: 145,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 145,
+    isVerified: true,
+    isFeatured: false,
   },
   // Photography
   {
     name: 'Shubh Wedding Films',
-    owner_name: 'Ankit Sharma',
+    ownerName: 'Ankit Sharma',
     category: 'Photography',
     city: 'Patna',
     area: 'Frazer Road',
-    price_start: 50000,
-    price_label: 'Starting from ₹50,000',
-    price_model: 'per event',
-    phone_number: '9876543230',
+    priceStart: 50000,
+    priceLabel: 'Starting from ₹50,000',
+    priceModel: 'per event',
+    phoneNumber: '9876543230',
     description: 'Award-winning wedding photography and cinematography.',
     rating: 4.9,
-    reviews_count: 267,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 267,
+    isVerified: true,
+    isFeatured: true,
   },
   {
     name: 'Pixel Perfect Studio',
-    owner_name: 'Deepak Kumar',
+    ownerName: 'Deepak Kumar',
     category: 'Photography',
     city: 'Lucknow',
     area: 'Hazratganj',
-    price_start: 40000,
-    price_label: 'Starting from ₹40,000',
-    phone_number: '9876543231',
+    priceStart: 40000,
+    priceLabel: 'Starting from ₹40,000',
+    phoneNumber: '9876543231',
     description: 'Professional wedding photography with modern techniques.',
     rating: 4.7,
-    reviews_count: 189,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 189,
+    isVerified: true,
+    isFeatured: false,
   },
   // Makeup
   {
     name: 'Glamour Studio',
-    owner_name: 'Priya Kumari',
+    ownerName: 'Priya Kumari',
     category: 'Makeup',
     city: 'Patna',
     area: 'Boring Road',
-    price_start: 15000,
-    price_label: 'Starting from ₹15,000',
-    phone_number: '9876543240',
+    priceStart: 15000,
+    priceLabel: 'Starting from ₹15,000',
+    phoneNumber: '9876543240',
     description: 'Bridal makeup specialist with international certifications.',
     rating: 4.8,
-    reviews_count: 234,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 234,
+    isVerified: true,
+    isFeatured: true,
   },
   {
     name: 'Beauty Brides',
-    owner_name: 'Neha Singh',
+    ownerName: 'Neha Singh',
     category: 'Makeup',
     city: 'Varanasi',
     area: 'Sigra',
-    price_start: 12000,
-    price_label: 'Starting from ₹12,000',
-    phone_number: '9876543241',
+    priceStart: 12000,
+    priceLabel: 'Starting from ₹12,000',
+    phoneNumber: '9876543241',
     description: 'Professional bridal makeup artist.',
     rating: 4.6,
-    reviews_count: 156,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 156,
+    isVerified: true,
+    isFeatured: false,
   },
   // Tent & Decor
   {
     name: 'Shree Ji Decorators',
-    owner_name: 'Rajesh Kumar',
+    ownerName: 'Rajesh Kumar',
     category: 'Tent',
     city: 'Patna',
     area: 'Patna City',
-    price_start: 100000,
-    price_label: 'Starting from ₹1,00,000',
-    phone_number: '9876543250',
+    priceStart: 100000,
+    priceLabel: 'Starting from ₹1,00,000',
+    phoneNumber: '9876543250',
     description: 'Premium wedding decoration and tent house.',
     rating: 4.7,
-    reviews_count: 178,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 178,
+    isVerified: true,
+    isFeatured: true,
   },
   {
     name: 'Royal Tent House',
-    owner_name: 'Sunil Singh',
+    ownerName: 'Sunil Singh',
     category: 'Tent',
     city: 'Bhagalpur',
     area: 'Tilkamanjhi',
-    price_start: 80000,
-    price_label: 'Starting from ₹80,000',
-    phone_number: '9876543251',
+    priceStart: 80000,
+    priceLabel: 'Starting from ₹80,000',
+    phoneNumber: '9876543251',
     description: 'Complete wedding decoration services.',
     rating: 4.5,
-    reviews_count: 98,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 98,
+    isVerified: true,
+    isFeatured: false,
   },
   // Mehndi
   {
     name: 'Heena Art Studio',
-    owner_name: 'Fatima Begum',
+    ownerName: 'Fatima Begum',
     category: 'Mehndi',
     city: 'Patna',
     area: 'Ashok Nagar',
-    price_start: 5000,
-    price_label: 'Starting from ₹5,000',
-    phone_number: '9876543260',
+    priceStart: 5000,
+    priceLabel: 'Starting from ₹5,000',
+    phoneNumber: '9876543260',
     description: 'Expert mehndi artist with 15+ years experience.',
     rating: 4.9,
-    reviews_count: 345,
-    is_verified: true,
-    is_featured: true,
+    reviewsCount: 345,
+    isVerified: true,
+    isFeatured: true,
   },
   // Anchor
   {
     name: 'MC Rohit Events',
-    owner_name: 'Rohit Ranjan',
+    ownerName: 'Rohit Ranjan',
     category: 'Anchor',
     city: 'Patna',
     area: 'Kankerbagh',
-    price_start: 20000,
-    price_label: 'Starting from ₹20,000',
-    phone_number: '9876543270',
+    priceStart: 20000,
+    priceLabel: 'Starting from ₹20,000',
+    phoneNumber: '9876543270',
     description: 'Professional wedding anchor and event host.',
     rating: 4.8,
-    reviews_count: 156,
-    is_verified: true,
-    is_featured: false,
+    reviewsCount: 156,
+    isVerified: true,
+    isFeatured: false,
   },
 ];
 
@@ -274,25 +268,20 @@ export async function POST(request: NextRequest) {
 
     for (const vendorData of sampleVendors) {
       // Check if vendor exists
-      const { data: existing } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('name', vendorData.name)
-        .maybeSingle();
+      const existing = await db.vendor.findFirst({
+        where: { name: vendorData.name }
+      });
 
       if (existing) continue;
 
       // Create vendor
-      const { data: vendor, error: vendorError } = await supabase
-        .from('vendors')
-        .insert([vendorData])
-        .select()
-        .single();
-
-      if (vendorError) {
-        errors.push(`Failed to create ${vendorData.name}: ${vendorError.message}`);
-        continue;
-      }
+      const vendor = await db.vendor.create({
+        data: {
+          id: nanoid(),
+          ...vendorData,
+          isActive: true,
+        }
+      });
 
       if (vendor) {
         // Add images
@@ -300,21 +289,19 @@ export async function POST(request: NextRequest) {
         const images = sampleImages[category] || sampleImages.catering;
         
         const imageRecords = images.map((url, index) => ({
-          vendor_id: vendor.id,
-          image_url: url,
-          is_primary: index === 0,
+          vendorId: vendor.id,
+          imageUrl: url,
+          isPrimary: index === 0,
           order: index,
         }));
         
-        await supabase.from('vendor_images').insert(imageRecords);
+        await db.vendorImage.createMany({ data: imageRecords });
         createdCount++;
       }
     }
 
     // Get total count
-    const { count: totalVendors } = await supabase
-      .from('vendors')
-      .select('id', { count: 'exact', head: true });
+    const totalVendors = await db.vendor.count();
 
     return NextResponse.json({
       success: true,
@@ -336,19 +323,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { count: vendors } = await supabase
-      .from('vendors')
-      .select('id', { count: 'exact', head: true });
-    
-    const { count: bookings } = await supabase
-      .from('bookings')
-      .select('id', { count: 'exact', head: true });
+    const vendors = await db.vendor.count();
+    const bookings = await db.booking.count();
     
     return NextResponse.json({
       success: true,
       data: {
-        vendors: vendors || 0,
-        bookings: bookings || 0,
+        vendors,
+        bookings,
         message: vendors === 0 ? 'Database is empty. POST to /api/seed to populate sample data.' : 'Database has data.',
       },
     });

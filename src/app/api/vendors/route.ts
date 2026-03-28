@@ -1,41 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVendors, createVendor, getStats } from '@/lib/supabase-db';
+import { db } from '@/lib/db';
+import { nanoid } from 'nanoid';
 
-// Transform snake_case to camelCase for frontend
+// Transform Prisma vendor to frontend format
 function transformVendor(vendor: any) {
   return {
     id: vendor.id,
     name: vendor.name,
-    ownerName: vendor.owner_name,
+    ownerName: vendor.ownerName,
     category: vendor.category,
     city: vendor.city,
     area: vendor.area,
     pincode: vendor.pincode,
-    priceStart: vendor.price_start,
-    priceLabel: vendor.price_label,
-    priceModel: vendor.price_model,
-    advancePercentage: vendor.advance_percentage,
-    maxGuests: vendor.max_guests,
-    extraHourCharge: vendor.extra_hour_charge,
-    distancePolicy: vendor.distance_policy,
+    priceStart: vendor.priceStart,
+    priceLabel: vendor.priceLabel,
+    priceModel: vendor.priceModel,
+    advancePercentage: vendor.advancePercentage,
+    maxGuests: vendor.maxGuests,
+    extraHourCharge: vendor.extraHourCharge,
+    distancePolicy: vendor.distancePolicy,
     rating: vendor.rating || 0,
-    reviewsCount: vendor.reviews_count || 0,
-    phoneNumber: vendor.phone_number,
+    reviewsCount: vendor.reviewsCount || 0,
+    phoneNumber: vendor.phoneNumber,
     description: vendor.description,
     services: vendor.services || [],
-    viewCount: vendor.view_count || 0,
-    isVerified: vendor.is_verified,
-    isFeatured: vendor.is_featured,
-    isActive: vendor.is_active,
-    createdAt: vendor.created_at,
-    updatedAt: vendor.updated_at,
+    viewCount: vendor.viewCount || 0,
+    isVerified: vendor.isVerified,
+    isFeatured: vendor.isFeatured,
+    isActive: vendor.isActive,
+    createdAt: vendor.createdAt,
+    updatedAt: vendor.updatedAt,
     images: vendor.images?.map((img: any) => ({
       id: img.id,
-      vendorId: img.vendor_id,
-      imageUrl: img.image_url,
-      isPrimary: img.is_primary,
+      vendorId: img.vendorId,
+      imageUrl: img.imageUrl,
+      isPrimary: img.isPrimary,
       order: img.order,
-      createdAt: img.created_at,
+      createdAt: img.createdAt,
     })) || [],
   };
 }
@@ -44,13 +45,53 @@ function transformVendor(vendor: any) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category') || undefined;
-    const city = searchParams.get('city') || undefined;
-    const search = searchParams.get('search') || undefined;
-    const featured = searchParams.get('featured') === 'true' ? true : undefined;
+    const category = searchParams.get('category');
+    const city = searchParams.get('city');
+    const search = searchParams.get('search');
+    const featured = searchParams.get('featured') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    const vendors = await getVendors({ category, city, search, featured, limit });
+    // Build where clause
+    const where: any = { isActive: true };
+    
+    if (category) {
+      where.category = { equals: category, mode: 'insensitive' };
+    }
+    
+    if (city) {
+      where.OR = [
+        { city: { equals: city, mode: 'insensitive' } },
+        { area: { contains: city, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { category: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { area: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (featured) {
+      where.isFeatured = true;
+    }
+
+    const vendors = await db.vendor.findMany({
+      where,
+      include: {
+        images: {
+          orderBy: { order: 'asc' }
+        }
+      },
+      orderBy: [
+        { isFeatured: 'desc' },
+        { rating: 'desc' }
+      ],
+      take: limit,
+    });
+
     const transformedVendors = vendors.map(transformVendor);
 
     return NextResponse.json({
@@ -72,52 +113,60 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Prepare vendor data with only supported columns
-    const vendorData: any = {
-      name: body.name,
-      owner_name: body.ownerName,
-      category: body.category,
-      city: body.city,
-      area: body.area,
-      pincode: body.pincode,
-      price_start: parseInt(body.priceStart) || 0,
-      price_label: body.priceLabel,
-      price_model: body.priceModel,
-      advance_percentage: body.advancePercentage ? parseInt(body.advancePercentage) : undefined,
-      max_guests: body.maxGuests,
-      extra_hour_charge: body.extraHourCharge,
-      distance_policy: body.distancePolicy,
-      phone_number: body.phoneNumber,
-      description: body.description,
-      is_verified: body.isVerified || false,
-      is_featured: body.isFeatured || false,
-      is_active: true,
-      rating: 0,
-      reviews_count: 0,
-    };
-
-    // Only add services if provided (column may not exist in older schemas)
-    if (body.services && Array.isArray(body.services) && body.services.length > 0) {
-      vendorData.services = body.services;
-    }
-
-    let vendor;
-    try {
-      vendor = await createVendor(vendorData, body.images);
-    } catch (createError: any) {
-      // If services column doesn't exist, retry without it
-      if (createError?.message?.includes('services') || createError?.code === 'PGRST204') {
-        console.log('Services column not found, creating without services');
-        delete vendorData.services;
-        vendor = await createVendor(vendorData, body.images);
-      } else {
-        throw createError;
+    // Generate ID
+    const vendorId = nanoid();
+    
+    // Create vendor
+    const vendor = await db.vendor.create({
+      data: {
+        id: vendorId,
+        name: body.name,
+        ownerName: body.ownerName || null,
+        category: body.category,
+        city: body.city,
+        area: body.area || null,
+        pincode: body.pincode || null,
+        priceStart: parseInt(body.priceStart) || 0,
+        priceLabel: body.priceLabel || `Starting from ₹${parseInt(body.priceStart || 0).toLocaleString()}`,
+        priceModel: body.priceModel || null,
+        advancePercentage: body.advancePercentage ? parseInt(body.advancePercentage) : null,
+        maxGuests: body.maxGuests || null,
+        extraHourCharge: body.extraHourCharge || null,
+        distancePolicy: body.distancePolicy || null,
+        phoneNumber: body.phoneNumber || null,
+        description: body.description || null,
+        isVerified: body.isVerified || false,
+        isFeatured: body.isFeatured || false,
+        isActive: true,
+        rating: 0,
+        reviewsCount: 0,
+      },
+      include: {
+        images: true
       }
+    });
+
+    // Add images if provided
+    if (body.images && Array.isArray(body.images) && body.images.length > 0) {
+      const imageRecords = body.images.map((url: string, index: number) => ({
+        vendorId: vendor.id,
+        imageUrl: url,
+        isPrimary: index === 0,
+        order: index,
+      }));
+      
+      await db.vendorImage.createMany({ data: imageRecords });
     }
+
+    // Fetch with images
+    const vendorWithImages = await db.vendor.findUnique({
+      where: { id: vendor.id },
+      include: { images: { orderBy: { order: 'asc' } } }
+    });
 
     return NextResponse.json({
       success: true,
-      data: transformVendor(vendor),
+      data: transformVendor(vendorWithImages),
       message: 'Service created successfully',
     });
   } catch (error) {

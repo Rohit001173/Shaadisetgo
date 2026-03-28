@@ -1,5 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVendorById, updateVendor, deleteVendor } from '@/lib/supabase-db';
+import { db } from '@/lib/db';
+
+// Transform Prisma vendor to frontend format
+function transformVendor(vendor: any) {
+  return {
+    id: vendor.id,
+    name: vendor.name,
+    ownerName: vendor.ownerName,
+    category: vendor.category,
+    city: vendor.city,
+    area: vendor.area,
+    pincode: vendor.pincode,
+    priceStart: vendor.priceStart,
+    priceLabel: vendor.priceLabel,
+    priceModel: vendor.priceModel,
+    advancePercentage: vendor.advancePercentage,
+    maxGuests: vendor.maxGuests,
+    extraHourCharge: vendor.extraHourCharge,
+    distancePolicy: vendor.distancePolicy,
+    rating: vendor.rating || 0,
+    reviewsCount: vendor.reviewsCount || 0,
+    phoneNumber: vendor.phoneNumber,
+    description: vendor.description,
+    services: vendor.services || [],
+    viewCount: vendor.viewCount || 0,
+    isVerified: vendor.isVerified,
+    isFeatured: vendor.isFeatured,
+    isActive: vendor.isActive,
+    createdAt: vendor.createdAt,
+    updatedAt: vendor.updatedAt,
+    images: vendor.images?.map((img: any) => ({
+      id: img.id,
+      vendorId: img.vendorId,
+      imageUrl: img.imageUrl,
+      isPrimary: img.isPrimary,
+      order: img.order,
+      createdAt: img.createdAt,
+    })) || [],
+  };
+}
 
 // GET /api/vendors/[id] - Get vendor by ID
 export async function GET(
@@ -9,7 +48,14 @@ export async function GET(
   try {
     const { id } = await params;
     
-    const vendor = await getVendorById(id);
+    const vendor = await db.vendor.findUnique({
+      where: { id },
+      include: {
+        images: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
 
     if (!vendor) {
       return NextResponse.json(
@@ -20,7 +66,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: vendor,
+      data: transformVendor(vendor),
     });
   } catch (error) {
     console.error('Error fetching vendor:', error);
@@ -40,30 +86,37 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const vendor = await updateVendor(id, {
-      name: body.name,
-      owner_name: body.ownerName,
-      category: body.category,
-      city: body.city,
-      area: body.area,
-      pincode: body.pincode,
-      price_start: body.priceStart ? parseInt(body.priceStart) : undefined,
-      price_label: body.priceLabel,
-      price_model: body.priceModel,
-      advance_percentage: body.advancePercentage ? parseInt(body.advancePercentage) : undefined,
-      max_guests: body.maxGuests,
-      extra_hour_charge: body.extraHourCharge,
-      distance_policy: body.distancePolicy,
-      phone_number: body.phoneNumber,
-      description: body.description,
-      is_verified: body.isVerified,
-      is_featured: body.isFeatured,
-      is_active: body.isActive,
+    const vendor = await db.vendor.update({
+      where: { id },
+      data: {
+        name: body.name,
+        ownerName: body.ownerName,
+        category: body.category,
+        city: body.city,
+        area: body.area,
+        pincode: body.pincode,
+        priceStart: body.priceStart ? parseInt(body.priceStart) : undefined,
+        priceLabel: body.priceLabel,
+        priceModel: body.priceModel,
+        advancePercentage: body.advancePercentage ? parseInt(body.advancePercentage) : undefined,
+        maxGuests: body.maxGuests,
+        extraHourCharge: body.extraHourCharge,
+        distancePolicy: body.distancePolicy,
+        phoneNumber: body.phoneNumber,
+        description: body.description,
+        isVerified: body.isVerified,
+        isFeatured: body.isFeatured,
+        isActive: body.isActive,
+        updatedAt: new Date(),
+      },
+      include: {
+        images: { orderBy: { order: 'asc' } }
+      }
     });
 
     return NextResponse.json({
       success: true,
-      data: vendor,
+      data: transformVendor(vendor),
       message: 'Vendor updated successfully',
     });
   } catch (error) {
@@ -82,7 +135,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await deleteVendor(id);
+    
+    await db.vendor.update({
+      where: { id },
+      data: { isActive: false, updatedAt: new Date() }
+    });
 
     return NextResponse.json({
       success: true,

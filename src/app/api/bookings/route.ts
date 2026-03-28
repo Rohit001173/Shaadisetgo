@@ -1,26 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createBooking, getBookings, getVendorById } from '@/lib/supabase-db';
+import { db } from '@/lib/db';
+import { nanoid } from 'nanoid';
 
-// Transform snake_case booking to camelCase for frontend
+// Generate booking ID
+function generateBookingId(): string {
+  const date = new Date();
+  const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().slice(-2)}`;
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `SSG-${dateStr}-${random}`;
+}
+
+// Transform Prisma booking to frontend format
 function transformBooking(booking: any) {
   return {
     id: booking.id,
-    bookingId: booking.booking_id,
-    vendorId: booking.vendor_id,
-    vendorName: booking.vendor_name,
-    customerId: booking.customer_id,
-    customerName: booking.customer_name,
-    customerPhone: booking.customer_phone,
-    customerEmail: booking.customer_email,
-    eventDate: booking.event_date,
+    bookingId: booking.bookingId,
+    vendorId: booking.vendorId,
+    vendorName: booking.vendorName,
+    customerId: booking.customerId,
+    customerName: booking.customerName,
+    customerPhone: booking.customerPhone,
+    customerEmail: booking.customerEmail,
+    eventDate: booking.eventDate,
     city: booking.city,
-    functionType: booking.function_type,
+    functionType: booking.functionType,
     guests: booking.guests,
     timing: booking.timing,
-    specialRequest: booking.special_request,
+    specialRequest: booking.specialRequest,
     status: booking.status,
-    createdAt: booking.created_at,
-    updatedAt: booking.updated_at,
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
   };
 }
 
@@ -28,12 +37,25 @@ function transformBooking(booking: any) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || undefined;
-    const phone = searchParams.get('phone') || undefined;
+    const status = searchParams.get('status');
+    const phone = searchParams.get('phone');
 
-    const bookings = await getBookings({ status, phone });
+    // Build where clause
+    const where: any = {};
     
-    // Transform bookings to camelCase
+    if (status) {
+      where.status = status;
+    }
+    
+    if (phone) {
+      where.customerPhone = phone;
+    }
+
+    const bookings = await db.booking.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+    
     const transformedBookings = bookings.map(transformBooking);
 
     return NextResponse.json({
@@ -56,7 +78,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Get vendor details
-    const vendor = await getVendorById(body.vendorId);
+    const vendor = await db.vendor.findUnique({
+      where: { id: body.vendorId }
+    });
+    
     if (!vendor) {
       return NextResponse.json(
         { success: false, error: 'Vendor not found' },
@@ -64,19 +89,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = await createBooking({
-      vendor_id: body.vendorId,
-      vendor_name: vendor.name,
-      customer_name: body.customerName,
-      customer_phone: body.customerPhone,
-      customer_email: body.customerEmail,
-      event_date: body.eventDate,
-      city: body.city,
-      function_type: body.functionType,
-      guests: body.guests,
-      timing: body.timing,
-      special_request: body.specialRequest,
-      status: 'pending',
+    const booking = await db.booking.create({
+      data: {
+        id: nanoid(),
+        bookingId: generateBookingId(),
+        vendorId: body.vendorId,
+        vendorName: vendor.name,
+        customerId: body.customerId || null,
+        customerName: body.customerName,
+        customerPhone: body.customerPhone,
+        customerEmail: body.customerEmail || null,
+        eventDate: body.eventDate,
+        city: body.city,
+        functionType: body.functionType,
+        guests: body.guests || null,
+        timing: body.timing || null,
+        specialRequest: body.specialRequest || null,
+        status: 'pending',
+      }
     });
 
     return NextResponse.json({
