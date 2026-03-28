@@ -13,17 +13,17 @@ export async function GET(request: NextRequest) {
       configured: isSupabaseConfigured(),
       url: process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Missing',
       anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing',
-      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Set' : '❌ Missing',
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Set (Service Role)' : '⚠️ Using Anon Key',
     },
     tables: {
-      vendors: '❓ Unknown',
-      services: '❓ Unknown',
-      categories: '❓ Unknown',
+      vendors: '❓ Unknown' as string,
+      services: '❓ Unknown' as string,
+      categories: '❓ Unknown' as string,
     },
     storage: {
-      bucket: '❓ Unknown',
+      bucket: '❓ Unknown' as string,
     },
-    connection: '❓ Unknown',
+    connection: '❓ Unknown' as string,
     errors: [] as string[],
   };
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Test vendors table
-    const { data: vendorsTest, error: vendorsError } = await supabaseAdmin!
+    const { error: vendorsError } = await supabaseAdmin!
       .from('vendors')
       .select('id')
       .limit(1);
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       : '✅ Accessible';
 
     // Test services table
-    const { data: servicesTest, error: servicesError } = await supabaseAdmin!
+    const { error: servicesError } = await supabaseAdmin!
       .from('services')
       .select('id')
       .limit(1);
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       : '✅ Accessible';
 
     // Test categories table
-    const { data: categoriesTest, error: categoriesError } = await supabaseAdmin!
+    const { error: categoriesError } = await supabaseAdmin!
       .from('categories')
       .select('id')
       .limit(1);
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     if (bucketError) {
       config.storage.bucket = `❌ ${bucketError.message}`;
     } else {
-      const vendorImageBucket = buckets?.find(b => b.name === 'Vendor_image');
+      const vendorImageBucket = buckets?.find((b: { name: string }) => b.name === 'Vendor_image');
       config.storage.bucket = vendorImageBucket 
         ? '✅ Vendor_image bucket exists' 
         : '⚠️ Vendor_image bucket not found';

@@ -18,11 +18,22 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Use service key if available, otherwise fall back to anon key
+const effectiveKey = supabaseServiceKey || supabaseAnonKey;
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Missing Supabase environment variables!');
   console.error('Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  console.error('Optional: SUPABASE_SERVICE_ROLE_KEY (for admin operations)');
 }
+
+// Log configuration status (helpful for debugging)
+console.log('[Supabase] Configuration status:', {
+  url: supabaseUrl ? '✅ Set' : '❌ Missing',
+  anonKey: supabaseAnonKey ? '✅ Set' : '❌ Missing',
+  serviceKey: supabaseServiceKey ? '✅ Set' : '⚠️ Using anon key',
+});
 
 // ============================================
 // TYPES
@@ -113,8 +124,9 @@ export interface Booking {
 // ============================================
 
 // Admin client with service role key (server-side only)
-export const supabaseAdmin = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+// Falls back to anon key if service key is not available
+export const supabaseAdmin = supabaseUrl && effectiveKey
+  ? createClient(supabaseUrl, effectiveKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
