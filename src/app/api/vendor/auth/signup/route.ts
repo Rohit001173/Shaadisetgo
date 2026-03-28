@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase-client';
 
 // Simple password hashing (in production, use bcrypt)
 function hashPassword(password: string): string {
@@ -11,6 +11,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { ownerName, phone, email, businessName, city, category, description, password } = body;
+
+    console.log('[Vendor Signup] Attempt for:', email, businessName);
 
     // Validation
     if (!ownerName || !phone || !email || !businessName || !city || !category || !password) {
@@ -34,45 +36,75 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if email or phone already exists
-    const existingVendor = await db.vendorUser.findFirst({
-      where: {
-        OR: [
-          { email: email.toLowerCase() },
-          { phone }
-        ]
-      }
-    });
+    // Check if Supabase is configured
+    if (!supabaseAdmin) {
+      console.error('[Vendor Signup] Supabase not configured');
+      return NextResponse.json(
+        { success: false, error: 'Database not configured. Please check environment variables.' },
+        { status: 500 }
+      );
+    }
 
-    if (existingVendor) {
-      if (existingVendor.email === email.toLowerCase()) {
-        return NextResponse.json(
-          { success: false, error: 'Email already registered' },
-          { status: 400 }
-        );
-      }
-      if (existingVendor.phone === phone) {
-        return NextResponse.json(
-          { success: false, error: 'Phone number already registered' },
-          { status: 400 }
-        );
-      }
+    // Check if email already exists
+    const { data: existingByEmail, error: emailCheckError } = await supabaseAdmin
+      .from('vendor_users')
+      .select('id')
+      .ilike('email', email.toLowerCase())
+      .single();
+
+    if (existingByEmail) {
+      return NextResponse.json(
+        { success: false, error: 'Email already registered' },
+        { status: 400 }
+      );
+    }
+
+    // Check if phone already exists
+    const { data: existingByPhone } = await supabaseAdmin
+      .from('vendor_users')
+      .select('id')
+      .eq('phone', phone)
+      .single();
+
+    if (existingByPhone) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number already registered' },
+        { status: 400 }
+      );
     }
 
     // Create vendor user with pending status
-    const vendor = await db.vendorUser.create({
-      data: {
+    const vendorId = `vendor_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    const { data: vendor, error: insertError } = await supabaseAdmin
+      .from('vendor_users')
+      .insert([{
+        id: vendorId,
         email: email.toLowerCase(),
-        phone,
+        phone: phone,
         password: hashPassword(password),
-        ownerName,
-        businessName,
-        city,
-        category,
+        owner_name: ownerName,
+        business_name: businessName,
+        city: city,
+        category: category,
         description: description || null,
-        vendorStatus: 'pending',
-      }
-    });
+        vendor_status: 'pending',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('[Vendor Signup] Insert error:', insertError);
+      return NextResponse.json(
+        { success: false, error: 'Registration failed. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Vendor Signup] Success:', vendor?.id);
 
     return NextResponse.json({
       success: true,
@@ -80,12 +112,12 @@ export async function POST(request: NextRequest) {
       data: {
         id: vendor.id,
         email: vendor.email,
-        businessName: vendor.businessName,
-        vendorStatus: vendor.vendorStatus,
+        businessName: vendor.business_name,
+        vendorStatus: vendor.vendor_status,
       }
     });
   } catch (error) {
-    console.error('Vendor signup error:', error);
+    console.error('[Vendor Signup] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Registration failed. Please try again.' },
       { status: 500 }

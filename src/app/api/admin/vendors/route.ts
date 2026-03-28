@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase-client';
 
 // GET - List all vendors with filtering
 export async function GET(request: NextRequest) {
@@ -9,62 +9,76 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search');
-    const skip = (page - 1) * limit;
 
-    // Build filter
-    const where: Record<string, unknown> = {};
+    console.log('[Admin Vendors] Fetching vendors:', { status, page, limit, search });
+
+    // Check if Supabase is configured
+    if (!supabaseAdmin) {
+      console.error('[Admin Vendors] Supabase not configured');
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Build query
+    let query = supabaseAdmin
+      .from('vendor_users')
+      .select('id, email, phone, owner_name, business_name, city, category, vendor_status, created_at', { count: 'exact' });
+
+    // Status filter
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-      where.vendorStatus = status;
+      query = query.eq('vendor_status', status);
     }
+
+    // Search filter
     if (search) {
-      where.OR = [
-        { businessName: { contains: search } },
-        { ownerName: { contains: search } },
-        { email: { contains: search } },
-        { phone: { contains: search } },
-      ];
+      query = query.or(`business_name.ilike.%${search}%,owner_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
     }
 
-    // Get total count
-    const total = await db.vendorUser.count({ where });
+    // Pagination
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to).order('created_at', { ascending: false });
 
-    // Get vendors
-    const vendors = await db.vendorUser.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        ownerName: true,
-        businessName: true,
-        city: true,
-        category: true,
-        vendorStatus: true,
-        createdAt: true,
-        _count: {
-          select: {
-            services: true,
-            bookings: true,
-          }
-        }
-      }
-    });
+    const { data: vendors, error, count } = await query;
+
+    if (error) {
+      console.error('[Admin Vendors] Query error:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch vendors' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Admin Vendors] Fetched:', vendors?.length, 'total:', count);
+
+    // Transform data to match expected format
+    const transformedVendors = (vendors || []).map(v => ({
+      id: v.id,
+      email: v.email,
+      phone: v.phone,
+      ownerName: v.owner_name,
+      businessName: v.business_name,
+      city: v.city,
+      category: v.category,
+      vendorStatus: v.vendor_status,
+      createdAt: v.created_at,
+      _count: { services: 0, bookings: 0 } // Placeholder
+    }));
 
     return NextResponse.json({
       success: true,
-      data: vendors,
+      data: transformedVendors,
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
       }
     });
   } catch (error) {
-    console.error('Get vendors error:', error);
+    console.error('[Admin Vendors] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch vendors' },
       { status: 500 }
