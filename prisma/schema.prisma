@@ -1,0 +1,195 @@
+// This is your Prisma schema file,
+// ShaadiSetGo - Wedding Vendor Marketplace
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  role      String   @default("customer") // customer, vendor, admin
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  bookings  Booking[]
+  vendors   Vendor[]
+}
+
+model Vendor {
+  id               String   @id @default(uuid())
+  name             String
+  ownerName        String?
+  category         String   // DJ, Catering, Tent, Makeup, Photography, etc.
+  city             String
+  area             String?
+  pincode          String?
+  priceStart       Int      // Starting price in INR
+  priceLabel       String?  // "Starting from ₹50,000"
+  priceModel       String?  // "per event", "per day", "per plate"
+  advancePercentage Int?
+  maxGuests        String?
+  extraHourCharge  String?
+  distancePolicy   String?
+  rating           Float    @default(0)
+  reviewsCount     Int      @default(0)
+  phoneNumber      String?
+  description      String?
+  isVerified       Boolean  @default(false)
+  isFeatured       Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  images     VendorImage[]
+  bookings   Booking[]
+  reviews    Review[]
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  
+  @@index([category])
+  @@index([city])
+  @@index([isFeatured])
+  @@index([isActive])
+}
+
+model VendorImage {
+  id        String   @id @default(uuid())
+  vendorId  String
+  imageUrl  String
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  @@index([vendorId])
+}
+
+model Booking {
+  id              String   @id @default(uuid())
+  bookingId       String   @unique // SSG-DATE-RANDOM format
+  vendorId        String
+  vendorName      String
+  customerId      String?
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  eventDate       String
+  city            String
+  functionType    String   // Wedding, Reception, Engagement, etc.
+  guests          String?
+  timing          String?
+  specialRequest  String?
+  status          String   @default("pending") // pending, confirmed, cancelled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  user      User?    @relation(fields: [customerId], references: [id])
+  
+  @@index([vendorId])
+  @@index([customerPhone])
+  @@index([status])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  vendorId  String
+  userId    String?
+  userName  String
+  rating    Float
+  comment   String?
+  createdAt DateTime @default(now())
+  
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  @@index([vendorId])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  icon        String?
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+}
+
+// Vendor User - For vendor authentication and profile
+model VendorUser {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  phone         String   @unique
+  password      String   // Hashed password
+  ownerName     String
+  businessName  String
+  city          String
+  category      String
+  description   String?
+  vendorStatus  String   @default("pending") // pending, approved, rejected
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  services      VendorService[]
+  bookings      VendorBooking[]
+  
+  @@index([email])
+  @@index([phone])
+  @@index([vendorStatus])
+}
+
+// Vendor Service - Individual services offered by vendor
+model VendorService {
+  id          String   @id @default(uuid())
+  vendorId    String
+  serviceName String
+  category    String
+  price       Int      // Price in INR
+  description String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  vendor      VendorUser  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  bookings    VendorBooking[]
+  
+  @@index([vendorId])
+  @@index([category])
+}
+
+// Vendor Booking - Bookings for vendor services
+model VendorBooking {
+  id              String   @id @default(uuid())
+  bookingId       String   @unique // SSG-VENDOR-DATE-RANDOM
+  vendorId        String
+  serviceId       String?
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  eventDate       String
+  eventTime       String?
+  venue           String?
+  guestCount      Int?
+  specialRequest  String?
+  status          String   @default("pending") // pending, confirmed, cancelled, completed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  vendor    VendorUser    @relation(fields: [vendorId], references: [id])
+  service   VendorService? @relation(fields: [serviceId], references: [id])
+  
+  @@index([vendorId])
+  @@index([status])
+}
