@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin, isSupabaseConfigured, updateBookingStatus } from '@/lib/supabase-client';
 
-// Transform Prisma booking to frontend format
+// Transform Supabase booking to frontend format
 function transformBooking(booking: any) {
   return {
     id: booking.id,
-    bookingId: booking.bookingId,
-    vendorId: booking.vendorId,
-    vendorName: booking.vendorName,
-    customerId: booking.customerId,
-    customerName: booking.customerName,
-    customerPhone: booking.customerPhone,
-    customerEmail: booking.customerEmail,
-    eventDate: booking.eventDate,
+    bookingId: booking.booking_id,
+    vendorId: booking.vendor_id,
+    vendorName: booking.vendor_name,
+    customerName: booking.customer_name,
+    customerPhone: booking.customer_phone,
+    customerEmail: booking.customer_email,
+    eventDate: booking.event_date,
     city: booking.city,
-    functionType: booking.functionType,
+    functionType: booking.function_type,
     guests: booking.guests,
     timing: booking.timing,
-    specialRequest: booking.specialRequest,
+    specialRequest: booking.special_request,
     status: booking.status,
-    createdAt: booking.createdAt,
-    updatedAt: booking.updatedAt,
+    createdAt: booking.created_at,
+    updatedAt: booking.updated_at,
   };
 }
 
@@ -31,12 +30,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
-    const booking = await db.booking.findUnique({
-      where: { id }
-    });
 
-    if (!booking) {
+    if (!isSupabaseConfigured() || !supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
       return NextResponse.json(
         { success: false, error: 'Booking not found' },
         { status: 404 }
@@ -45,7 +53,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: transformBooking(booking),
+      data: transformBooking(data),
     });
   } catch (error) {
     console.error('Error fetching booking:', error);
@@ -65,17 +73,24 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const booking = await db.booking.update({
-      where: { id },
-      data: {
-        status: body.status,
-        updatedAt: new Date(),
-      }
-    });
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    const success = await updateBookingStatus(id, body.status);
+
+    if (!success) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to update booking' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      data: transformBooking(booking),
       message: `Booking ${body.status} successfully`,
     });
   } catch (error) {

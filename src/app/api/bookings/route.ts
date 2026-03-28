@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { nanoid } from 'nanoid';
+import {
+  createBooking,
+  getBookingsByPhone,
+  isSupabaseConfigured,
+  getVendorById
+} from '@/lib/supabase-client';
 
 // Generate booking ID
 function generateBookingId(): string {
@@ -10,53 +14,79 @@ function generateBookingId(): string {
   return `SSG-${dateStr}-${random}`;
 }
 
-// Transform Prisma booking to frontend format
+// Transform Supabase booking to frontend format
 function transformBooking(booking: any) {
   return {
     id: booking.id,
-    bookingId: booking.bookingId,
-    vendorId: booking.vendorId,
-    vendorName: booking.vendorName,
-    customerId: booking.customerId,
-    customerName: booking.customerName,
-    customerPhone: booking.customerPhone,
-    customerEmail: booking.customerEmail,
-    eventDate: booking.eventDate,
+    bookingId: booking.booking_id,
+    vendorId: booking.vendor_id,
+    vendorName: booking.vendor_name,
+    customerName: booking.customer_name,
+    customerPhone: booking.customer_phone,
+    customerEmail: booking.customer_email,
+    eventDate: booking.event_date,
     city: booking.city,
-    functionType: booking.functionType,
+    functionType: booking.function_type,
     guests: booking.guests,
     timing: booking.timing,
-    specialRequest: booking.specialRequest,
+    specialRequest: booking.special_request,
     status: booking.status,
-    createdAt: booking.createdAt,
-    updatedAt: booking.updatedAt,
+    createdAt: booking.created_at,
+    updatedAt: booking.updated_at,
   };
 }
 
 // GET /api/bookings - Get all bookings
 export async function GET(request: NextRequest) {
   try {
+    console.log('[API] GET /api/bookings - Fetching bookings...');
+
+    if (!isSupabaseConfigured()) {
+      console.error('[API] Supabase not configured');
+      return NextResponse.json({
+        success: false,
+        error: 'Database not configured',
+        data: [],
+      });
+    }
+
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
     const phone = searchParams.get('phone');
 
-    // Build where clause
-    const where: any = {};
-    
-    if (status) {
-      where.status = status;
-    }
-    
+    let bookings;
     if (phone) {
-      where.customerPhone = phone;
+      bookings = await getBookingsByPhone(phone);
+    } else {
+      // Get all bookings from Supabase
+      const { supabaseAdmin } = await import('@/lib/supabase-client');
+      if (!supabaseAdmin) {
+        return NextResponse.json({
+          success: false,
+          error: 'Database not available',
+          data: [],
+        });
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('bookings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[API] Error fetching bookings:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to fetch bookings',
+          data: [],
+        });
+      }
+
+      bookings = data;
     }
 
-    const bookings = await db.booking.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
-    
     const transformedBookings = bookings.map(transformBooking);
+
+    console.log(`[API] Returning ${transformedBookings.length} bookings`);
 
     return NextResponse.json({
       success: true,
@@ -64,9 +94,9 @@ export async function GET(request: NextRequest) {
       meta: { total: transformedBookings.length },
     });
   } catch (error) {
-    console.error('Error fetching bookings:', error);
+    console.error('[API] Error fetching bookings:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch bookings' },
+      { success: false, error: 'Failed to fetch bookings', data: [] },
       { status: 500 }
     );
   }
@@ -75,39 +105,46 @@ export async function GET(request: NextRequest) {
 // POST /api/bookings - Create a new booking
 export async function POST(request: NextRequest) {
   try {
+    console.log('[API] POST /api/bookings - Creating booking...');
+
+    if (!isSupabaseConfigured()) {
+      console.error('[API] Supabase not configured');
+      return NextResponse.json({
+        success: false,
+        error: 'Database not configured',
+      });
+    }
+
     const body = await request.json();
-    
+
     // Get vendor details
-    const vendor = await db.vendor.findUnique({
-      where: { id: body.vendorId }
-    });
-    
-    if (!vendor) {
+    const vendor = await getVendorById(body.vendorId);
+
+    const bookingData = {
+      vendor_id: body.vendorId,
+      vendor_name: vendor?.name || 'Unknown Vendor',
+      customer_name: body.customerName,
+      customer_phone: body.customerPhone,
+      customer_email: body.customerEmail || null,
+      event_date: body.eventDate,
+      city: body.city,
+      function_type: body.functionType,
+      guests: body.guests || null,
+      timing: body.timing || null,
+      special_request: body.specialRequest || null,
+    };
+
+    const booking = await createBooking(bookingData);
+
+    if (!booking) {
+      console.error('[API] Failed to create booking');
       return NextResponse.json(
-        { success: false, error: 'Vendor not found' },
-        { status: 404 }
+        { success: false, error: 'Failed to create booking' },
+        { status: 500 }
       );
     }
 
-    const booking = await db.booking.create({
-      data: {
-        id: nanoid(),
-        bookingId: generateBookingId(),
-        vendorId: body.vendorId,
-        vendorName: vendor.name,
-        customerId: body.customerId || null,
-        customerName: body.customerName,
-        customerPhone: body.customerPhone,
-        customerEmail: body.customerEmail || null,
-        eventDate: body.eventDate,
-        city: body.city,
-        functionType: body.functionType,
-        guests: body.guests || null,
-        timing: body.timing || null,
-        specialRequest: body.specialRequest || null,
-        status: 'pending',
-      }
-    });
+    console.log('[API] Booking created:', booking.booking_id);
 
     return NextResponse.json({
       success: true,
@@ -115,7 +152,7 @@ export async function POST(request: NextRequest) {
       message: 'Booking request submitted successfully',
     });
   } catch (error) {
-    console.error('Error creating booking:', error);
+    console.error('[API] Error creating booking:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create booking' },
       { status: 500 }
