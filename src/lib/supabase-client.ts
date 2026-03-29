@@ -73,12 +73,10 @@ export interface Service {
   service_name: string;
   category: string;
   city?: string;
-  price: number;
+  price?: number;
   description?: string;
   image_url?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
 }
 
 export interface Category {
@@ -391,7 +389,6 @@ export async function getServices(filters?: {
     let query = supabaseAdmin
       .from('services')
       .select('*')
-      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
     // Category filter
@@ -449,9 +446,6 @@ export async function createService(serviceData: Partial<Service>): Promise<Serv
     const newService = {
       ...serviceData,
       id: `service_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      is_active: serviceData.is_active !== false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabaseAdmin

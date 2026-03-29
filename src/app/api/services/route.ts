@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase-client';
 import { randomUUID } from 'crypto';
 
-// Supabase configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const isSupabaseConfigured = supabaseUrl && serviceKey;
-
-const supabaseAdmin = isSupabaseConfigured
-  ? createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-  : null;
+console.log('[Services API] Module loaded, isSupabaseConfigured:', isSupabaseConfigured());
 
 // CORS headers
 const corsHeaders = {
@@ -31,8 +21,10 @@ export async function OPTIONS() {
  */
 export async function GET(request: NextRequest) {
   console.log('[API] GET /api/services - Fetching services...');
+  console.log('[API] supabaseAdmin is:', supabaseAdmin ? 'READY' : 'NULL');
 
   if (!supabaseAdmin) {
+    console.log('[API] ERROR: supabaseAdmin is null!');
     return NextResponse.json({
       success: false,
       error: 'Database not configured',
@@ -106,11 +98,13 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   console.log('[API] POST /api/services - Creating service...');
+  console.log('[API] supabaseAdmin status:', supabaseAdmin ? 'READY' : 'NULL');
 
   if (!supabaseAdmin) {
+    console.error('[API] ERROR: supabaseAdmin is null!');
     return NextResponse.json({
       success: false,
-      error: 'Database not configured',
+      error: 'Database not configured - check environment variables',
     }, { status: 500, headers: corsHeaders });
   }
 

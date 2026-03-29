@@ -1,34 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Bucket name - must match exactly in Supabase Storage
-const BUCKET_NAME = 'Vendor_image';
-
-// Create Supabase client for storage only
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Check if Supabase is configured
-const isSupabaseConfigured = supabaseUrl && serviceKey;
-
-const supabaseAdmin = isSupabaseConfigured
-  ? createClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : null;
+import { supabaseAdmin, STORAGE_BUCKET, isSupabaseConfigured } from '@/lib/supabase-client';
 
 export async function POST(request: NextRequest) {
   console.log('[Upload API] Starting upload...');
+  console.log('[Upload API] isSupabaseConfigured:', isSupabaseConfigured());
+  console.log('[Upload API] supabaseAdmin:', supabaseAdmin ? 'READY' : 'NULL');
 
   try {
     // Check if Supabase is configured
     if (!supabaseAdmin) {
-      console.error('[Upload API] Supabase not configured');
+      console.error('[Upload API] Supabase not configured - supabaseAdmin is null');
       return NextResponse.json(
-        { success: false, error: 'Image upload is not configured. Please set up Supabase storage.' },
+        { success: false, error: 'Image upload is not configured. Check environment variables.' },
         { status: 500 }
       );
     }
@@ -91,10 +74,10 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
 
-      console.log('[Upload API] Uploading to bucket:', BUCKET_NAME, 'file:', fileName);
+      console.log('[Upload API] Uploading to bucket:', STORAGE_BUCKET, 'file:', fileName);
 
       const { data, error } = await supabaseAdmin.storage
-        .from(BUCKET_NAME)
+        .from(STORAGE_BUCKET)
         .upload(fileName, uint8Array, {
           cacheControl: '3600',
           upsert: false,
@@ -108,7 +91,7 @@ export async function POST(request: NextRequest) {
 
       // Get public URL
       const { data: urlData } = supabaseAdmin.storage
-        .from(BUCKET_NAME)
+        .from(STORAGE_BUCKET)
         .getPublicUrl(fileName);
 
       console.log('[Upload API] File uploaded successfully:', urlData.publicUrl);
