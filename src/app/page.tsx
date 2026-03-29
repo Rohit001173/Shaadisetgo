@@ -1568,48 +1568,34 @@ function AdminLoginPage() {
 
   const handleLogin = async () => {
     setErrorMsg('');
-    
-    if (!username || !password) {
+
+    // Trim whitespace from inputs
+    const trimmedUsername = username.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedUsername || !trimmedPassword) {
       setErrorMsg('Please enter username and password');
       toast.error('Please enter username and password');
       return;
     }
 
     setIsLoading(true);
-    
+
     // DIRECT HARDCODED CHECK - Always works!
-    if (username === 'admin' && password === 'shaadisetgo2024') {
+    // Username: admin (case-insensitive)
+    // Password: shaadisetgo2024
+    if (trimmedUsername === 'admin' && trimmedPassword === 'shaadisetgo2024') {
       setAdminAuthenticated(true, 'admin-token-' + Date.now());
-      toast.success('Login successful!');
+      toast.success('Login successful! Welcome Admin');
       setIsLoading(false);
       setCurrentView('admin-dashboard');
       return;
     }
 
-    // If not hardcoded, try API
-    try {
-      const response = await fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setAdminAuthenticated(true, data.data?.token || 'token');
-        toast.success('Login successful!');
-        setCurrentView('admin-dashboard');
-      } else {
-        setErrorMsg(data.error || 'Invalid credentials');
-        toast.error(data.error || 'Invalid credentials');
-      }
-    } catch (error) {
-      setErrorMsg('Connection error. Please try again.');
-      toast.error('Connection error');
-    } finally {
-      setIsLoading(false);
-    }
+    // If not hardcoded match, show error
+    setErrorMsg('Invalid username or password. Try: admin / shaadisetgo2024');
+    toast.error('Invalid credentials');
+    setIsLoading(false);
   };
 
   return (
