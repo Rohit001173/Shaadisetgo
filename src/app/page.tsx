@@ -1573,22 +1573,36 @@ function AdminLoginPage() {
 
     setIsLoading(true);
     try {
+      console.log('[AdminLogin] Sending request...');
       const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
+      console.log('[AdminLogin] Response status:', response.status);
+
+      // Handle non-OK responses
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[AdminLogin] Error response:', text.substring(0, 200));
+        toast.error(`Server error (${response.status}). Please try again.`);
+        return;
+      }
+
       const data = await response.json();
+      console.log('[AdminLogin] Response:', data);
+
       if (data.success) {
-        setAdminAuthenticated(true, data.data.token);
+        setAdminAuthenticated(true, data.data?.token || 'token');
         toast.success('Login successful!');
         setCurrentView('admin-dashboard');
       } else {
         toast.error(data.error || 'Invalid credentials');
       }
     } catch (error) {
-      toast.error('Login failed');
+      console.error('[AdminLogin] Error:', error);
+      toast.error('Login failed. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
