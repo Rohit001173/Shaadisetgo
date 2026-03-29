@@ -1119,16 +1119,11 @@ const pricingTypes = [
 function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    vendor_name: '',
     service_name: '',
     category: 'DJ',
     city: 'Patna',
     price: '',
-    pricing_type: 'per_event',
-    phone: '',
-    whatsapp: '',
     description: '',
-    includes: '',
   });
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -1179,7 +1174,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.vendor_name || !formData.service_name || !formData.category || !formData.city) {
+    if (!formData.service_name || !formData.category || !formData.city) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -1187,22 +1182,13 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
     setIsSubmitting(true);
 
     try {
-      // Parse includes as array
-      const includesArray = formData.includes
-        ? formData.includes.split(',').map(item => item.trim()).filter(Boolean)
-        : [];
-
+      // Only send fields that exist in Supabase table
       const payload = {
-        vendor_name: formData.vendor_name,
         service_name: formData.service_name,
         category: formData.category,
         city: formData.city,
         price: formData.price ? parseInt(formData.price) : null,
-        pricing_type: formData.pricing_type,
-        phone: formData.phone || null,
-        whatsapp: formData.whatsapp || formData.phone || null,
         description: formData.description || null,
-        includes: includesArray,
         image_url: images.length > 0 ? images[0] : null,
       };
 
@@ -1300,35 +1286,23 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
           <p className="text-xs text-gray-400 mt-2">First image will be primary. Max 5MB per image.</p>
         </div>
 
-        {/* Vendor & Service Info */}
+        {/* Service Info */}
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
               <Store className="w-4 h-4 text-[#E8437A]" />
             </div>
-            <h2 className="font-semibold">Vendor & Service Info</h2>
+            <h2 className="font-semibold">Service Info</h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label>Vendor Name *</Label>
-              <Input
-                value={formData.vendor_name}
-                onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
-                placeholder="e.g., DJ Rahul Events"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label>Service Name *</Label>
-              <Input
-                value={formData.service_name}
-                onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                placeholder="e.g., Wedding DJ Service"
-                className="mt-1"
-              />
-            </div>
+          <div>
+            <Label>Service Name *</Label>
+            <Input
+              value={formData.service_name}
+              onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+              placeholder="e.g., Wedding DJ Service"
+              className="mt-1"
+            />
           </div>
         </div>
 
@@ -1377,7 +1351,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
           </div>
         </div>
 
-        {/* Pricing Section */}
+        {/* Pricing */}
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
@@ -1386,119 +1360,15 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <h2 className="font-semibold">Pricing</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Starting Price (₹) *</Label>
-              <Input
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                placeholder="e.g., 25000"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label>Pricing Type</Label>
-              <select
-                value={formData.pricing_type}
-                onChange={(e) => setFormData({ ...formData, pricing_type: e.target.value })}
-                className="w-full px-3 py-2.5 border rounded-lg bg-background mt-1"
-              >
-                {pricingTypes.map(type => (
-                  <option key={type.id} value={type.id}>{type.icon} {type.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Price Preview */}
-          {formData.price && (
-            <div className="bg-gradient-to-r from-[#FFF0F5] to-pink-50 rounded-xl p-3 border border-pink-100">
-              <p className="text-sm text-gray-600">Price Preview:</p>
-              <p className="text-xl font-bold text-[#E8437A]">
-                ₹{parseInt(formData.price).toLocaleString()}
-                <span className="text-sm font-normal text-gray-500 ml-1">
-                  {pricingTypes.find(t => t.id === formData.pricing_type)?.label}
-                </span>
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Contact Details */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
-              <Phone className="w-4 h-4 text-[#E8437A]" />
-            </div>
-            <h2 className="font-semibold">Contact Details</h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Phone Number</Label>
-              <Input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="e.g., 9876543210"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label>WhatsApp Number</Label>
-              <Input
-                type="tel"
-                value={formData.whatsapp}
-                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                placeholder="Same as phone if same"
-                className="mt-1"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* What's Included */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-[#E8437A]" />
-            </div>
-            <h2 className="font-semibold">क्या-क्या Include है?</h2>
-          </div>
-
           <div>
-            <Label>Services/Items Included</Label>
-            <Textarea
-              value={formData.includes}
-              onChange={(e) => setFormData({ ...formData, includes: e.target.value })}
-              placeholder="e.g., DJ Setup, Sound System, Lighting, Dance Floor, MC Service (comma se separate karein)"
-              rows={3}
+            <Label>Starting Price (₹)</Label>
+            <Input
+              type="number"
+              value={formData.price}
+              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+              placeholder="e.g., 25000"
               className="mt-1"
             />
-            <p className="text-xs text-gray-400 mt-1">Comma (,) se separate karein</p>
-          </div>
-
-          {/* Quick Tags */}
-          <div className="flex flex-wrap gap-2">
-            {['Sound System', 'Lighting', 'DJ Setup', 'Photo Album', 'Video Editing', 'Travel', 'Setup & Cleanup'].map(item => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  const current = formData.includes ? formData.includes.split(',').map(s => s.trim()) : [];
-                  if (!current.includes(item)) {
-                    const newIncludes = current.filter(Boolean).join(', ') + (current.length > 0 ? ', ' : '') + item;
-                    setFormData({ ...formData, includes: newIncludes.trim() });
-                  }
-                }}
-                className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-[#FFF0F5] hover:text-[#E8437A] transition-colors"
-              >
-                + {item}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -1516,7 +1386,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe your service, experience, specialties, what makes you unique..."
+              placeholder="Describe your service, experience, specialties..."
               rows={4}
               className="mt-1"
             />
