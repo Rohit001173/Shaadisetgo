@@ -11,7 +11,7 @@ import {
   ArrowLeft, Star, MapPin, Phone, MessageCircle, BadgeCheck,
   Calendar, Users, Filter, ChevronDown, Plus, Edit, Trash2,
   Settings, LogOut, BarChart3, Store, FileText, Shield,
-  CheckCircle, XCircle, AlertCircle, Search, X, RefreshCw, Sparkles, Upload, Image
+  CheckCircle, XCircle, AlertCircle, Search, X, RefreshCw, Sparkles, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -1084,40 +1084,71 @@ function AdminEditVendorPage({ vendor, setCurrentView }: { vendor: Vendor; setCu
 }
 
 // ==================== ADMIN ADD SERVICE PAGE ====================
+// Available cities in Bihar & UP
+const availableCities = [
+  { id: 'patna', name: 'Patna', state: 'Bihar' },
+  { id: 'gaya', name: 'Gaya', state: 'Bihar' },
+  { id: 'muzaffarpur', name: 'Muzaffarpur', state: 'Bihar' },
+  { id: 'bhagalpur', name: 'Bhagalpur', state: 'Bihar' },
+  { id: 'purnia', name: 'Purnia', state: 'Bihar' },
+  { id: 'darbhanga', name: 'Darbhanga', state: 'Bihar' },
+  { id: 'siwan', name: 'Siwan', state: 'Bihar' },
+  { id: 'gopalganj', name: 'Gopalganj', state: 'Bihar' },
+  { id: 'chapra', name: 'Chapra', state: 'Bihar' },
+  { id: 'hajipur', name: 'Hajipur', state: 'Bihar' },
+  { id: 'begusarai', name: 'Begusarai', state: 'Bihar' },
+  { id: 'gorakhpur', name: 'Gorakhpur', state: 'UP' },
+  { id: 'varanasi', name: 'Varanasi', state: 'UP' },
+  { id: 'lucknow', name: 'Lucknow', state: 'UP' },
+  { id: 'kanpur', name: 'Kanpur', state: 'UP' },
+  { id: 'allahabad', name: 'Prayagraj', state: 'UP' },
+  { id: 'deoria', name: 'Deoria', state: 'UP' },
+  { id: 'kushinagar', name: 'Kushinagar', state: 'UP' },
+  { id: 'mau', name: 'Mau', state: 'UP' },
+  { id: 'azamgarh', name: 'Azamgarh', state: 'UP' },
+];
+
+// Pricing types
+const pricingTypes = [
+  { id: 'per_event', label: 'Per Event', icon: '🎊' },
+  { id: 'per_day', label: 'Per Day', icon: '📅' },
+  { id: 'per_hour', label: 'Per Hour', icon: '⏰' },
+  { id: 'fixed', label: 'Fixed Price', icon: '💰' },
+];
+
 function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    vendor_name: '',
     service_name: '',
     category: 'DJ',
     city: 'Patna',
     price: '',
+    pricing_type: 'per_event',
+    phone: '',
+    whatsapp: '',
     description: '',
+    includes: '',
   });
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Handle multiple image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Check if we can add more images
     if (images.length + files.length > 6) {
       toast.error('Maximum 6 images allowed');
       return;
     }
 
     setUploading(true);
-    setUploadError(null);
 
-    // Upload each file
     for (const file of Array.from(files)) {
       try {
         const formDataToSend = new FormData();
         formDataToSend.append('file', file);
-
-        console.log('[Admin] Uploading file:', file.name);
 
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -1125,7 +1156,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
         });
 
         const data = await response.json();
-        console.log('[Admin] Upload response:', data);
 
         if (data.success && data.url) {
           setImages(prev => [...prev, data.url]);
@@ -1134,17 +1164,14 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
           toast.error(data.error || `Failed to upload ${file.name}`);
         }
       } catch (error) {
-        console.error('[Admin] Upload error:', error);
         toast.error(`Failed to upload ${file.name}`);
       }
     }
 
     setUploading(false);
-    // Reset input
     e.target.value = '';
   };
 
-  // Remove image
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
   };
@@ -1152,21 +1179,31 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.service_name || !formData.category || !formData.city) {
-      toast.error('Please fill all required fields (Name, Category, City)');
+    if (!formData.vendor_name || !formData.service_name || !formData.category || !formData.city) {
+      toast.error('Please fill all required fields');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      // Parse includes as array
+      const includesArray = formData.includes
+        ? formData.includes.split(',').map(item => item.trim()).filter(Boolean)
+        : [];
+
       const payload = {
+        vendor_name: formData.vendor_name,
         service_name: formData.service_name,
         category: formData.category,
         city: formData.city,
         price: formData.price ? parseInt(formData.price) : null,
+        pricing_type: formData.pricing_type,
+        phone: formData.phone || null,
+        whatsapp: formData.whatsapp || formData.phone || null,
         description: formData.description || null,
-        images: images,
+        includes: includesArray,
+        image_url: images.length > 0 ? images[0] : null,
       };
 
       console.log('[Admin] Submitting service:', payload);
@@ -1178,7 +1215,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
       });
 
       const data = await response.json();
-      console.log('[Admin] Service response:', data);
 
       if (data.success) {
         toast.success('Service added successfully! 🎉');
@@ -1187,7 +1223,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
         toast.error(data.error || 'Failed to add service');
       }
     } catch (error) {
-      console.error('[Admin] Submit error:', error);
       toast.error('Failed to add service. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -1197,31 +1232,36 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
       {/* Header */}
-      <div className="bg-white sticky top-0 z-40 border-b">
-        <div className="px-4 py-3 flex items-center gap-3">
+      <div className="bg-gradient-to-br from-[#E8437A] to-pink-400 text-white px-4 py-6">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setCurrentView('dashboard')}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 bg-white/20 rounded-lg hover:bg-white/30"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold">Add New Service</h1>
+          <div>
+            <h1 className="text-xl font-bold">Add New Service</h1>
+            <p className="text-white/80 text-sm">Fill all details carefully</p>
+          </div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        {/* Image Upload */}
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
+        {/* Image Upload Section */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-[#E8437A]" />
+            </div>
             <Label className="text-base font-semibold">Service Images</Label>
-            <span className="text-sm text-gray-500">{images.length}/6</span>
+            <span className="ml-auto text-sm text-gray-500">{images.length}/6</span>
           </div>
 
-          {/* Uploaded Images Grid */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-2">
             {images.map((img, idx) => (
               <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
-                <img src={img} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
+                <img src={img} alt={`Service image ${idx + 1}`} className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(idx)}
@@ -1236,8 +1276,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
                 )}
               </div>
             ))}
-
-            {/* Upload Button */}
             {images.length < 6 && (
               <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#E8437A] hover:bg-pink-50 transition-all">
                 {uploading ? (
@@ -1259,80 +1297,237 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
               </label>
             )}
           </div>
-
-          {/* Upload Error */}
-          {uploadError && (
-            <div className="p-2 bg-red-50 rounded-lg text-red-600 text-sm">
-              {uploadError}
-            </div>
-          )}
-
-          <p className="text-xs text-gray-400 mt-2">
-            First image will be used as primary. Max 5MB per image.
-          </p>
+          <p className="text-xs text-gray-400 mt-2">First image will be primary. Max 5MB per image.</p>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm space-y-4">
+        {/* Vendor & Service Info */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <Store className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">Vendor & Service Info</h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label>Vendor Name *</Label>
+              <Input
+                value={formData.vendor_name}
+                onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
+                placeholder="e.g., DJ Rahul Events"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>Service Name *</Label>
+              <Input
+                value={formData.service_name}
+                onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                placeholder="e.g., Wedding DJ Service"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Category & Location */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <MapPin className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">Category & Location</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Category *</Label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2.5 border rounded-lg bg-background mt-1"
+              >
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.name}>{cat.icon} {cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label>City *</Label>
+              <select
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                className="w-full px-3 py-2.5 border rounded-lg bg-background mt-1"
+              >
+                <optgroup label="Bihar">
+                  {availableCities.filter(c => c.state === 'Bihar').map(city => (
+                    <option key={city.id} value={city.name}>{city.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Uttar Pradesh">
+                  {availableCities.filter(c => c.state === 'UP').map(city => (
+                    <option key={city.id} value={city.name}>{city.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing Section */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <span className="text-lg">💰</span>
+            </div>
+            <h2 className="font-semibold">Pricing</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Starting Price (₹) *</Label>
+              <Input
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="e.g., 25000"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>Pricing Type</Label>
+              <select
+                value={formData.pricing_type}
+                onChange={(e) => setFormData({ ...formData, pricing_type: e.target.value })}
+                className="w-full px-3 py-2.5 border rounded-lg bg-background mt-1"
+              >
+                {pricingTypes.map(type => (
+                  <option key={type.id} value={type.id}>{type.icon} {type.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Price Preview */}
+          {formData.price && (
+            <div className="bg-gradient-to-r from-[#FFF0F5] to-pink-50 rounded-xl p-3 border border-pink-100">
+              <p className="text-sm text-gray-600">Price Preview:</p>
+              <p className="text-xl font-bold text-[#E8437A]">
+                ₹{parseInt(formData.price).toLocaleString()}
+                <span className="text-sm font-normal text-gray-500 ml-1">
+                  {pricingTypes.find(t => t.id === formData.pricing_type)?.label}
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Contact Details */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <Phone className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">Contact Details</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Phone Number</Label>
+              <Input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="e.g., 9876543210"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>WhatsApp Number</Label>
+              <Input
+                type="tel"
+                value={formData.whatsapp}
+                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                placeholder="Same as phone if same"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* What's Included */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">क्या-क्या Include है?</h2>
+          </div>
+
           <div>
-            <Label>Service Name *</Label>
-            <Input
-              value={formData.service_name}
-              onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-              placeholder="e.g., DJ Rahul Wedding Services"
+            <Label>Services/Items Included</Label>
+            <Textarea
+              value={formData.includes}
+              onChange={(e) => setFormData({ ...formData, includes: e.target.value })}
+              placeholder="e.g., DJ Setup, Sound System, Lighting, Dance Floor, MC Service (comma se separate karein)"
+              rows={3}
               className="mt-1"
             />
+            <p className="text-xs text-gray-400 mt-1">Comma (,) se separate karein</p>
+          </div>
+
+          {/* Quick Tags */}
+          <div className="flex flex-wrap gap-2">
+            {['Sound System', 'Lighting', 'DJ Setup', 'Photo Album', 'Video Editing', 'Travel', 'Setup & Cleanup'].map(item => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  const current = formData.includes ? formData.includes.split(',').map(s => s.trim()) : [];
+                  if (!current.includes(item)) {
+                    const newIncludes = current.filter(Boolean).join(', ') + (current.length > 0 ? ', ' : '') + item;
+                    setFormData({ ...formData, includes: newIncludes.trim() });
+                  }
+                }}
+                className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-[#FFF0F5] hover:text-[#E8437A] transition-colors"
+              >
+                + {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <FileText className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">Description</h2>
           </div>
 
           <div>
-            <Label>Category *</Label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg bg-background mt-1"
-            >
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.name}>{cat.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label>City *</Label>
-            <Input
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="City"
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label>Starting Price</Label>
-            <Input
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              placeholder="e.g., 25000"
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label>Description</Label>
+            <Label>About Service</Label>
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe your service..."
+              placeholder="Describe your service, experience, specialties, what makes you unique..."
               rows={4}
               className="mt-1"
             />
           </div>
         </div>
 
+        {/* Submit Button */}
         <Button
           type="submit"
           disabled={isSubmitting || uploading}
-          className="w-full bg-[#E8437A] hover:bg-[#d63a6d] py-6 text-lg font-semibold"
+          className="w-full bg-[#E8437A] hover:bg-[#d63a6d] py-6 text-lg font-semibold rounded-2xl shadow-lg"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">

@@ -125,11 +125,16 @@ export async function POST(request: NextRequest) {
 
       serviceData = {
         service_name: body.service_name || body.serviceName,
+        vendor_name: body.vendor_name || body.vendorName || null,
         category: body.category,
         city: body.city || null,
         price: body.price ? parseInt(body.price) : null,
+        pricing_type: body.pricing_type || 'per_event',
+        phone: body.phone || null,
+        whatsapp: body.whatsapp || body.phone || null,
         description: body.description || null,
-        image_url: body.images && body.images.length > 0 ? body.images[0] : null,
+        includes: body.includes || null,
+        image_url: body.image_url || (body.images && body.images.length > 0 ? body.images[0] : null),
         vendor_id: body.vendor_id || body.vendorId || null,
         is_active: true,
       };
