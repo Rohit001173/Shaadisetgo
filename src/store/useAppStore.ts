@@ -96,6 +96,7 @@ interface AppState {
   vendors: Vendor[];
   featuredVendors: Vendor[];
   services: Service[];
+  selectedService: Service | null;
   bookings: Booking[];
   categories: Category[];
   selectedVendor: Vendor | null;
@@ -126,6 +127,7 @@ interface AppState {
   setVendors: (vendors: Vendor[]) => void;
   setFeaturedVendors: (vendors: Vendor[]) => void;
   setServices: (services: Service[]) => void;
+  setSelectedService: (service: Service | null) => void;
   setBookings: (bookings: Booking[]) => void;
   setCategories: (categories: Category[]) => void;
   setSelectedVendor: (vendor: Vendor | null) => void;
@@ -169,6 +171,7 @@ export const useAppStore = create<AppState>()(
       vendors: [],
       featuredVendors: [],
       services: [],
+      selectedService: null,
       bookings: [],
       categories: [],
       selectedVendor: null,
@@ -201,6 +204,8 @@ export const useAppStore = create<AppState>()(
       setFeaturedVendors: (featuredVendors) => set({ featuredVendors }),
 
       setServices: (services) => set({ services }),
+
+      setSelectedService: (service) => set({ selectedService: service } as unknown as Partial<AppState>),
 
       setBookings: (bookings) => set({ bookings }),
       
