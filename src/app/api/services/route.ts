@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 
 // Supabase configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
       console.log('[API] JSON body:', body);
 
       serviceData = {
+        id: randomUUID(),
         service_name: body.service_name || body.serviceName,
         vendor_name: body.vendor_name || body.vendorName || null,
         category: body.category,
@@ -143,6 +145,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
 
       serviceData = {
+        id: randomUUID(),
         service_name: formData.get('service_name') || formData.get('serviceName'),
         category: formData.get('category'),
         city: formData.get('city') || null,
