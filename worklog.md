@@ -328,3 +328,30 @@ Stage Summary:
 - Entry point added in Profile page with "Vendor Portal" button
 - Mobile-first responsive design maintained
 - SQLite database updated with new vendor tables
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Fix 'includes' column error and enhance Add Service form
+
+Work Log:
+- Fixed the "Could not find the 'includes' column" error in Supabase
+- Updated AdminAddServicePage with comprehensive form fields:
+  * Vendor Name (व्यापारी का नाम)
+  * Service Name (सेवा का नाम)
+  * Category selection (श्रेणी)
+  * City dropdown (शहर) - Bihar & UP cities
+  * Starting Price (मूल्य)
+  * Pricing Type (Per Event/Day/Hour/Fixed)
+  * Contact Number
+  * WhatsApp Number
+  * Description (विवरण)
+- Since Supabase table has limited columns, extra fields are stored in description field in structured format
+- Image upload working with max 6 images
+- API route already correctly configured to use only existing columns
+
+Stage Summary:
+- Admin can now add services with all requested information
+- No more database column errors
+- Form includes Hindi labels for better UX
+- Contact info, pricing type embedded in description field

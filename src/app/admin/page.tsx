@@ -251,7 +251,7 @@ function AdminDashboard({ setCurrentView, onLogout }: { setCurrentView: (view: a
 
   useEffect(() => {
     fetchStats();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const menuItems = [
@@ -1119,10 +1119,14 @@ const pricingTypes = [
 function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    vendor_name: '',
     service_name: '',
     category: 'DJ',
     city: 'Patna',
     price: '',
+    pricing_type: 'per_event',
+    contact_number: '',
+    whatsapp_number: '',
     description: '',
   });
   const [images, setImages] = useState<string[]>([]);
@@ -1175,7 +1179,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
     e.preventDefault();
 
     if (!formData.service_name || !formData.category || !formData.city) {
-      toast.error('Please fill all required fields');
+      toast.error('Service name, category and city are required');
       return;
     }
 
@@ -1183,12 +1187,20 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
 
     try {
       // Only send fields that exist in Supabase table
+      // vendor_name, pricing_type, contact_number, whatsapp_number stored in description
+      const descriptionParts = [];
+      if (formData.vendor_name) descriptionParts.push(`Vendor: ${formData.vendor_name}`);
+      if (formData.contact_number) descriptionParts.push(`Contact: ${formData.contact_number}`);
+      if (formData.whatsapp_number) descriptionParts.push(`WhatsApp: ${formData.whatsapp_number}`);
+      if (formData.pricing_type) descriptionParts.push(`Pricing: ${pricingTypes.find(p => p.id === formData.pricing_type)?.label || formData.pricing_type}`);
+      if (formData.description) descriptionParts.push(`\n${formData.description}`);
+
       const payload = {
         service_name: formData.service_name,
         category: formData.category,
         city: formData.city,
         price: formData.price ? parseInt(formData.price) : null,
-        description: formData.description || null,
+        description: descriptionParts.join('\n'),
         image_url: images.length > 0 ? images[0] : null,
       };
 
@@ -1286,17 +1298,27 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
           <p className="text-xs text-gray-400 mt-2">First image will be primary. Max 5MB per image.</p>
         </div>
 
-        {/* Service Info */}
+        {/* Vendor & Service Info */}
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
               <Store className="w-4 h-4 text-[#E8437A]" />
             </div>
-            <h2 className="font-semibold">Service Info</h2>
+            <h2 className="font-semibold">Vendor & Service Info</h2>
           </div>
 
           <div>
-            <Label>Service Name *</Label>
+            <Label>Vendor Name (व्यापारी का नाम)</Label>
+            <Input
+              value={formData.vendor_name}
+              onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
+              placeholder="e.g., R.K. DJ Services"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label>Service Name * (सेवा का नाम)</Label>
             <Input
               value={formData.service_name}
               onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
@@ -1317,7 +1339,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Category *</Label>
+              <Label>Category * (श्रेणी)</Label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -1330,7 +1352,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             </div>
 
             <div>
-              <Label>City *</Label>
+              <Label>City * (शहर)</Label>
               <select
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
@@ -1357,18 +1379,67 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
               <span className="text-lg">💰</span>
             </div>
-            <h2 className="font-semibold">Pricing</h2>
+            <h2 className="font-semibold">Pricing (मूल्य)</h2>
           </div>
 
-          <div>
-            <Label>Starting Price (₹)</Label>
-            <Input
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              placeholder="e.g., 25000"
-              className="mt-1"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Starting Price (₹)</Label>
+              <Input
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="e.g., 25000"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>Pricing Type</Label>
+              <select
+                value={formData.pricing_type}
+                onChange={(e) => setFormData({ ...formData, pricing_type: e.target.value })}
+                className="w-full px-3 py-2.5 border rounded-lg bg-background mt-1"
+              >
+                {pricingTypes.map(type => (
+                  <option key={type.id} value={type.id}>{type.icon} {type.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Info */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <Phone className="w-4 h-4 text-[#E8437A]" />
+            </div>
+            <h2 className="font-semibold">Contact Info (संपर्क)</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Contact Number</Label>
+              <Input
+                type="tel"
+                value={formData.contact_number}
+                onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                placeholder="e.g., 9876543210"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>WhatsApp Number</Label>
+              <Input
+                type="tel"
+                value={formData.whatsapp_number}
+                onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                placeholder="e.g., 9876543210"
+                className="mt-1"
+              />
+            </div>
           </div>
         </div>
 
@@ -1378,15 +1449,15 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
               <FileText className="w-4 h-4 text-[#E8437A]" />
             </div>
-            <h2 className="font-semibold">Description</h2>
+            <h2 className="font-semibold">Description (विवरण)</h2>
           </div>
 
           <div>
-            <Label>About Service</Label>
+            <Label>About Service (सेवा के बारे में)</Label>
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe your service, experience, specialties..."
+              placeholder="Describe your service, experience, specialties... अपनी सेवा का विवरण दें..."
               rows={4}
               className="mt-1"
             />
@@ -1420,21 +1491,31 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
 function AdminSettingsPage({ setCurrentView }: { setCurrentView: (view: any) => void }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handlePasswordChange = async () => {
+  const handlePasswordChange = () => {
     if (!currentPassword || !newPassword) {
       toast.error('Please fill all fields');
       return;
     }
 
-    setIsSubmitting(true);
-    // For now, just show success - in real app, this would update password
+    if (currentPassword !== ADMIN_PASSWORD) {
+      toast.error('Current password is incorrect');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+
+    setIsSaving(true);
+    // In a real app, this would update the password in the database
     setTimeout(() => {
-      toast.success('Password changed successfully!');
+      toast.success('Password changed successfully! (Demo mode)');
       setCurrentPassword('');
       setNewPassword('');
-      setIsSubmitting(false);
+      setIsSaving(false);
     }, 1000);
   };
 
@@ -1455,46 +1536,53 @@ function AdminSettingsPage({ setCurrentView }: { setCurrentView: (view: any) => 
 
       <div className="p-4 space-y-4">
         {/* Password Section */}
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold mb-4">Change Password</h2>
-          <div className="space-y-3">
-            <div>
-              <Label>Current Password</Label>
-              <Input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-              />
+        <div className="bg-white rounded-xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#FFF0F5] rounded-lg flex items-center justify-center">
+              <Shield className="w-4 h-4 text-[#E8437A]" />
             </div>
-            <div>
-              <Label>New Password</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-              />
-            </div>
-            <Button
-              onClick={handlePasswordChange}
-              disabled={isSubmitting}
-              className="w-full bg-[#E8437A]"
-            >
-              {isSubmitting ? 'Updating...' : 'Update Password'}
-            </Button>
+            <h2 className="font-semibold">Change Password</h2>
           </div>
+
+          <div>
+            <Label>Current Password</Label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label>New Password</Label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+              className="mt-1"
+            />
+          </div>
+
+          <Button
+            onClick={handlePasswordChange}
+            disabled={isSaving}
+            className="w-full bg-[#E8437A] hover:bg-[#d63a6d]"
+          >
+            {isSaving ? 'Updating...' : 'Update Password'}
+          </Button>
         </div>
 
-        {/* Info */}
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <h3 className="font-medium text-blue-800 mb-2">Admin Portal Info</h3>
-          <p className="text-sm text-blue-600">
-            This admin panel is accessible at <code className="bg-blue-100 px-1 rounded">/admin</code>
-          </p>
-          <p className="text-sm text-blue-600 mt-2">
-            Current credentials: <code className="bg-blue-100 px-1 rounded">admin / shaadisetgo2024</code>
-          </p>
+        {/* App Info */}
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <h3 className="font-semibold mb-2">App Information</h3>
+          <div className="space-y-2 text-sm text-gray-600">
+            <p>Version: 1.0.0</p>
+            <p>ShaadiSetGo Admin Panel</p>
+            <p>Wedding Vendor Marketplace</p>
+          </div>
         </div>
       </div>
     </div>
