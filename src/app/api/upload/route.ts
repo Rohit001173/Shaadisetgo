@@ -1,17 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, STORAGE_BUCKET, isSupabaseConfigured } from '@/lib/supabase-client';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Storage bucket name
+const STORAGE_BUCKET = 'Vendor_image';
+
+// Get environment variables directly to avoid any caching issues
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Create client inline to ensure fresh instance
+function getSupabaseClient(): SupabaseClient | null {
+  const key = supabaseServiceKey || supabaseAnonKey;
+  if (!supabaseUrl || !key) {
+    console.error('[Upload] Missing config:', {
+      url: supabaseUrl ? 'SET' : 'MISSING',
+      serviceKey: supabaseServiceKey ? 'SET' : 'MISSING',
+      anonKey: supabaseAnonKey ? 'SET' : 'MISSING',
+    });
+    return null;
+  }
+  return createClient(supabaseUrl, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+// Ensure bucket exists
+async function ensureBucketExists(client: SupabaseClient): Promise<{ success: boolean; error?: string }> {
+  try {
+    // List buckets
+    const { data: buckets, error: listError } = await client.storage.listBuckets();
+    
+    if (listError) {
+      console.error('[Upload] Error listing buckets:', listError);
+      return { success: false, error: `Failed to list buckets: ${listError.message}` };
+    }
+
+    const bucketExists = buckets?.some(b => b.name === STORAGE_BUCKET);
+    
+    if (!bucketExists) {
+      console.log('[Upload] Creating bucket:', STORAGE_BUCKET);
+      const { error: createError } = await client.storage.createBucket(STORAGE_BUCKET, {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+      });
+      
+      if (createError) {
+        console.error('[Upload] Error creating bucket:', createError);
+        return { success: false, error: `Failed to create bucket: ${createError.message}` };
+      }
+      console.log('[Upload] Bucket created successfully');
+    }
+    
+    return { success: true };
+  } catch (err) {
+    console.error('[Upload] Exception in ensureBucketExists:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
 
 export async function POST(request: NextRequest) {
   console.log('[Upload API] Starting upload...');
-  console.log('[Upload API] isSupabaseConfigured:', isSupabaseConfigured());
-  console.log('[Upload API] supabaseAdmin:', supabaseAdmin ? 'READY' : 'NULL');
+  
+  const client = getSupabaseClient();
+  
+  if (!client) {
+    console.error('[Upload API] Failed to create Supabase client');
+    return NextResponse.json(
+      { success: false, error: 'Supabase client initialization failed. Check environment variables.' },
+      { status: 500 }
+    );
+  }
 
   try {
-    // Check if Supabase is configured
-    if (!supabaseAdmin) {
-      console.error('[Upload API] Supabase not configured - supabaseAdmin is null');
+    // Ensure bucket exists
+    const bucketResult = await ensureBucketExists(client);
+    if (!bucketResult.success) {
       return NextResponse.json(
-        { success: false, error: 'Image upload is not configured. Check environment variables.' },
+        { success: false, error: `Storage setup failed: ${bucketResult.error}` },
         { status: 500 }
       );
     }
@@ -24,7 +93,7 @@ export async function POST(request: NextRequest) {
     const singleFile = formData.get('file') as File | null;
     if (singleFile && singleFile.size > 0) {
       files = [singleFile];
-      console.log('[Upload API] Single file received:', singleFile.name);
+      console.log('[Upload API] Single file received:', singleFile.name, singleFile.size, 'bytes');
     }
 
     const multipleFiles = formData.getAll('files') as File[];
@@ -53,7 +122,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file sizes (max 5MB each for storage)
+    // Validate file sizes (max 5MB each)
     const maxSize = 5 * 1024 * 1024; // 5MB
     const oversizedFiles = files.filter(file => file.size > maxSize);
 
@@ -76,7 +145,7 @@ export async function POST(request: NextRequest) {
 
       console.log('[Upload API] Uploading to bucket:', STORAGE_BUCKET, 'file:', fileName);
 
-      const { data, error } = await supabaseAdmin.storage
+      const { data, error } = await client.storage
         .from(STORAGE_BUCKET)
         .upload(fileName, uint8Array, {
           cacheControl: '3600',
@@ -90,7 +159,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Get public URL
-      const { data: urlData } = supabaseAdmin.storage
+      const { data: urlData } = client.storage
         .from(STORAGE_BUCKET)
         .getPublicUrl(fileName);
 
@@ -119,8 +188,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Upload API] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, error: 'Failed to upload images. Please check if the bucket exists and is public.' },
+      { success: false, error: `Upload failed: ${errorMessage}` },
       { status: 500 }
     );
   }

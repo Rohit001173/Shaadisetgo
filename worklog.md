@@ -355,3 +355,33 @@ Stage Summary:
 - No more database column errors
 - Form includes Hindi labels for better UX
 - Contact info, pricing type embedded in description field
+
+---
+Task ID: 10
+Agent: Main Agent
+Task: Fix Supabase connection issues for image upload and service creation
+
+Work Log:
+- Created new diagnostic API endpoint `/api/debug` to test:
+  * Environment variables status
+  * Database connection (services table)
+  * Storage connection (bucket listing)
+- Completely rewrote `/api/upload/route.ts`:
+  * Created Supabase client inline to avoid caching issues
+  * Added `ensureBucketExists()` function to auto-create storage bucket
+  * Proper TypeScript types with SupabaseClient import
+  * Better error handling with specific error messages
+  * Support for both single file and multiple file uploads
+- Completely rewrote `/api/services/route.ts`:
+  * Created Supabase client inline to ensure fresh connection
+  * Better error messages for debugging
+  * CORS headers support
+  * Proper handling of JSON and FormData
+- Fixed ESLint parsing error with ReturnType<typeof createClient> syntax
+
+Stage Summary:
+- Supabase connection issues resolved
+- Image upload now auto-creates bucket if missing
+- Services API properly connects to Supabase database
+- Debug API available for troubleshooting connection issues
+- All APIs create fresh Supabase client instances to avoid initialization issues

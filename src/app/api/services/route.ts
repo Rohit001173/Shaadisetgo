@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase-client';
+import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
-console.log('[Services API] Module loaded, isSupabaseConfigured:', isSupabaseConfigured());
+// Get environment variables directly
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Create client inline to ensure fresh instance
+function getSupabaseClient() {
+  const key = supabaseServiceKey || supabaseAnonKey;
+  if (!supabaseUrl || !key) {
+    console.error('[Services API] Missing config:', {
+      url: supabaseUrl ? 'SET' : 'MISSING',
+      serviceKey: supabaseServiceKey ? 'SET' : 'MISSING',
+      anonKey: supabaseAnonKey ? 'SET' : 'MISSING',
+    });
+    return null;
+  }
+  return createClient(supabaseUrl, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 // CORS headers
 const corsHeaders = {
@@ -21,13 +43,14 @@ export async function OPTIONS() {
  */
 export async function GET(request: NextRequest) {
   console.log('[API] GET /api/services - Fetching services...');
-  console.log('[API] supabaseAdmin is:', supabaseAdmin ? 'READY' : 'NULL');
-
-  if (!supabaseAdmin) {
-    console.log('[API] ERROR: supabaseAdmin is null!');
+  
+  const client = getSupabaseClient();
+  
+  if (!client) {
+    console.log('[API] ERROR: Failed to create Supabase client!');
     return NextResponse.json({
       success: false,
-      error: 'Database not configured',
+      error: 'Database connection failed',
       data: [],
     }, { headers: corsHeaders });
   }
@@ -35,7 +58,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    let query = supabaseAdmin
+    let query = client
       .from('services')
       .select('*')
       .order('created_at', { ascending: false });
@@ -76,7 +99,6 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[API] Returning ${data?.length || 0} services`);
-    console.log('[API] Services data:', data);
 
     return NextResponse.json({
       success: true,
@@ -98,13 +120,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   console.log('[API] POST /api/services - Creating service...');
-  console.log('[API] supabaseAdmin status:', supabaseAdmin ? 'READY' : 'NULL');
-
-  if (!supabaseAdmin) {
-    console.error('[API] ERROR: supabaseAdmin is null!');
+  
+  const client = getSupabaseClient();
+  
+  if (!client) {
+    console.error('[API] ERROR: Failed to create Supabase client!');
     return NextResponse.json({
       success: false,
-      error: 'Database not configured - check environment variables',
+      error: 'Database connection failed. Please check your configuration.',
     }, { status: 500, headers: corsHeaders });
   }
 
@@ -152,7 +175,7 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        const { error: uploadError } = await supabaseAdmin.storage
+        const { error: uploadError } = await client.storage
           .from('Vendor_image')
           .upload(fileName, uint8Array, {
             cacheControl: '3600',
@@ -161,7 +184,7 @@ export async function POST(request: NextRequest) {
           });
 
         if (!uploadError) {
-          const { data: urlData } = supabaseAdmin.storage
+          const { data: urlData } = client.storage
             .from('Vendor_image')
             .getPublicUrl(fileName);
           serviceData.image_url = urlData.publicUrl;
@@ -179,7 +202,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[API] Inserting service:', serviceData);
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await client
       .from('services')
       .insert([serviceData])
       .select()
