@@ -37,6 +37,8 @@ export default function ShaadiSetGoApp() {
     goBack,
     vendors,
     setVendors,
+    services,
+    setServices,
     selectedVendor,
     setSelectedVendor,
     selectedCategory,
@@ -53,11 +55,25 @@ export default function ShaadiSetGoApp() {
     setLoading,
   } = useAppStore();
 
-  // Fetch vendors on mount
+  // Fetch vendors and services on mount
   useEffect(() => {
     fetchVendors();
+    fetchServices();
     seedDatabase();
   }, []);
+
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/services');
+      const data = await response.json();
+      if (data.success) {
+        setServices(data.data);
+        console.log('[App] Fetched services:', data.data.length);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    }
+  };
 
   const seedDatabase = async () => {
     try {

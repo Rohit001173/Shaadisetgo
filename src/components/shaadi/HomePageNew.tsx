@@ -86,7 +86,7 @@ interface SearchResult {
 }
 
 export function HomePageNew() {
-  const { setCurrentView, setSelectedCategory, setSelectedVendor, setSelectedCity, vendors } = useAppStore();
+  const { setCurrentView, setSelectedCategory, setSelectedVendor, setSelectedCity, vendors, services } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -98,6 +98,28 @@ export function HomePageNew() {
 
   // Get all subcategories for search
   const allSubcategories = useMemo(() => getAllSubcategories(), []);
+
+  // Convert services from database to display format
+  const displayServices = useMemo(() => {
+    if (services && services.length > 0) {
+      return services.map((service, index) => ({
+        id: service.id,
+        name: service.service_name,
+        nameHindi: '',
+        emoji: weddingCategories.find(c => c.name.toLowerCase() === service.category?.toLowerCase())?.icon || '💒',
+        gradient: 'from-[#E8437A] to-pink-500',
+        rating: 4.5,
+        reviews: 0,
+        price: service.price ? `₹${Math.round(service.price / 1000)}K` : 'Contact',
+        category: service.category,
+        city: service.city,
+        image_url: service.image_url,
+        description: service.description,
+      }));
+    }
+    // Fallback to static cards if no services
+    return serviceCards;
+  }, [services]);
 
   // Auto-slide banner
   useEffect(() => {
@@ -688,8 +710,8 @@ export function HomePageNew() {
 
           {/* Mobile: Horizontal Scroll */}
           <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2 lg:hidden">
-            {serviceCards.map((service) => {
-              const isWishlisted = wishlist.has(service.id);
+            {displayServices.map((service) => {
+              const isWishlisted = wishlist.has(typeof service.id === 'string' ? service.id.charCodeAt(0) : service.id);
               
               return (
                 <div
@@ -737,8 +759,8 @@ export function HomePageNew() {
 
           {/* Desktop: Grid Layout */}
           <div className="hidden lg:grid lg:grid-cols-4 gap-6">
-            {serviceCards.map((service) => {
-              const isWishlisted = wishlist.has(service.id);
+            {displayServices.map((service) => {
+              const isWishlisted = wishlist.has(typeof service.id === 'string' ? service.id.charCodeAt(0) : service.id);
               
               return (
                 <div

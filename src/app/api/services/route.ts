@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('services')
       .select('*')
-      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -85,6 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[API] Returning ${data?.length || 0} services`);
+    console.log('[API] Services data:', data);
 
     return NextResponse.json({
       success: true,
@@ -134,7 +134,6 @@ export async function POST(request: NextRequest) {
         description: body.description || null,
         image_url: body.image_url || (body.images && body.images.length > 0 ? body.images[0] : null),
         vendor_id: body.vendor_id || body.vendorId || null,
-        is_active: true,
       };
     } else {
       // Handle FormData
@@ -148,7 +147,6 @@ export async function POST(request: NextRequest) {
         price: formData.get('price') ? parseInt(formData.get('price') as string) : null,
         description: formData.get('description') || null,
         vendor_id: formData.get('vendor_id') || formData.get('vendorId') || null,
-        is_active: true,
       };
 
       // Handle image upload
@@ -195,6 +193,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[API] Insert error:', error);
+      console.error('[API] Error details:', JSON.stringify(error, null, 2));
       return NextResponse.json({
         success: false,
         error: error.message || 'Failed to create service',

@@ -2,6 +2,19 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Vendor, Booking, Category, VendorFilters } from '@/types';
 
+// Service type for marketplace services
+export interface Service {
+  id: string;
+  service_name: string;
+  category: string;
+  city: string;
+  price?: number;
+  description?: string;
+  image_url?: string;
+  vendor_id?: string;
+  created_at?: string;
+}
+
 // View types for navigation
 export type ViewType = 
   | 'home' 
@@ -78,10 +91,11 @@ interface AppState {
   // Navigation
   currentView: ViewType;
   previousView: ViewType | null;
-  
+
   // Data
   vendors: Vendor[];
   featuredVendors: Vendor[];
+  services: Service[];
   bookings: Booking[];
   categories: Category[];
   selectedVendor: Vendor | null;
@@ -111,6 +125,7 @@ interface AppState {
   goBack: () => void;
   setVendors: (vendors: Vendor[]) => void;
   setFeaturedVendors: (vendors: Vendor[]) => void;
+  setServices: (services: Service[]) => void;
   setBookings: (bookings: Booking[]) => void;
   setCategories: (categories: Category[]) => void;
   setSelectedVendor: (vendor: Vendor | null) => void;
@@ -153,6 +168,7 @@ export const useAppStore = create<AppState>()(
       previousView: null,
       vendors: [],
       featuredVendors: [],
+      services: [],
       bookings: [],
       categories: [],
       selectedVendor: null,
@@ -181,9 +197,11 @@ export const useAppStore = create<AppState>()(
       })),
       
       setVendors: (vendors) => set({ vendors }),
-      
+
       setFeaturedVendors: (featuredVendors) => set({ featuredVendors }),
-      
+
+      setServices: (services) => set({ services }),
+
       setBookings: (bookings) => set({ bookings }),
       
       setCategories: (categories) => set({ categories }),
