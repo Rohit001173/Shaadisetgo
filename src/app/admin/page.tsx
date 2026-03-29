@@ -1090,7 +1090,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
     service_name: '',
     category: 'DJ',
     city: 'Patna',
-    area: '',
     price: '',
     description: '',
   });
@@ -1165,7 +1164,6 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
         service_name: formData.service_name,
         category: formData.category,
         city: formData.city,
-        area: formData.area || null,
         price: formData.price ? parseInt(formData.price) : null,
         description: formData.description || null,
         images: images,
@@ -1298,25 +1296,14 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>City *</Label>
-              <Input
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="City"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Area</Label>
-              <Input
-                value={formData.area}
-                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                placeholder="Area"
-                className="mt-1"
-              />
-            </div>
+          <div>
+            <Label>City *</Label>
+            <Input
+              value={formData.city}
+              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              placeholder="City"
+              className="mt-1"
+            />
           </div>
 
           <div>
