@@ -2,23 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
-// Get environment variables directly
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Get environment variables
+function getConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  return {
+    url: supabaseUrl,
+    key: supabaseServiceKey || supabaseAnonKey,
+    hasServiceKey: !!supabaseServiceKey,
+    hasAnonKey: !!supabaseAnonKey,
+  };
+}
 
-// Create client inline to ensure fresh instance
+// Create Supabase client
 function getSupabaseClient() {
-  const key = supabaseServiceKey || supabaseAnonKey;
-  if (!supabaseUrl || !key) {
+  const { url, key } = getConfig();
+  
+  if (!url || !key) {
     console.error('[Services API] Missing config:', {
-      url: supabaseUrl ? 'SET' : 'MISSING',
-      serviceKey: supabaseServiceKey ? 'SET' : 'MISSING',
-      anonKey: supabaseAnonKey ? 'SET' : 'MISSING',
+      url: url ? 'SET' : 'MISSING',
+      key: key ? 'SET' : 'MISSING',
     });
     return null;
   }
-  return createClient(supabaseUrl, key, {
+  
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -42,15 +52,15 @@ export async function OPTIONS() {
  * Fetch services with optional filters
  */
 export async function GET(request: NextRequest) {
-  console.log('[API] GET /api/services - Fetching services...');
+  console.log('[Services API] GET request received');
   
   const client = getSupabaseClient();
   
   if (!client) {
-    console.log('[API] ERROR: Failed to create Supabase client!');
+    console.error('[Services API] Failed to create client');
     return NextResponse.json({
       success: false,
-      error: 'Database connection failed',
+      error: 'Database connection failed. Please check Supabase configuration.',
       data: [],
     }, { headers: corsHeaders });
   }
@@ -90,7 +100,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[API] Query error:', error);
+      console.error('[Services API] Query error:', error);
       return NextResponse.json({
         success: false,
         error: error.message,
@@ -98,14 +108,14 @@ export async function GET(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    console.log(`[API] Returning ${data?.length || 0} services`);
+    console.log(`[Services API] Returning ${data?.length || 0} services`);
 
     return NextResponse.json({
       success: true,
       data: data || [],
     }, { headers: corsHeaders });
   } catch (error) {
-    console.error('[API] Error:', error);
+    console.error('[Services API] Error:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to fetch services',
@@ -119,15 +129,15 @@ export async function GET(request: NextRequest) {
  * Create a new service
  */
 export async function POST(request: NextRequest) {
-  console.log('[API] POST /api/services - Creating service...');
+  console.log('[Services API] POST request received');
   
   const client = getSupabaseClient();
   
   if (!client) {
-    console.error('[API] ERROR: Failed to create Supabase client!');
+    console.error('[Services API] Failed to create client');
     return NextResponse.json({
       success: false,
-      error: 'Database connection failed. Please check your configuration.',
+      error: 'Database connection failed. Please check Supabase configuration.',
     }, { status: 500, headers: corsHeaders });
   }
 
@@ -139,7 +149,7 @@ export async function POST(request: NextRequest) {
     // Handle JSON body
     if (contentType.includes('application/json')) {
       const body = await request.json();
-      console.log('[API] JSON body:', body);
+      console.log('[Services API] Request body:', body);
 
       // Only include columns that exist in Supabase table
       serviceData = {
@@ -169,7 +179,6 @@ export async function POST(request: NextRequest) {
       // Handle image upload
       const imageFile = formData.get('image') as File | null;
       if (imageFile && imageFile.size > 0) {
-        // Upload to storage
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `services/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const arrayBuffer = await imageFile.arrayBuffer();
@@ -200,7 +209,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400, headers: corsHeaders });
     }
 
-    console.log('[API] Inserting service:', serviceData);
+    console.log('[Services API] Inserting:', serviceData);
 
     const { data, error } = await client
       .from('services')
@@ -209,15 +218,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('[API] Insert error:', error);
-      console.error('[API] Error details:', JSON.stringify(error, null, 2));
+      console.error('[Services API] Insert error:', error);
       return NextResponse.json({
         success: false,
         error: error.message || 'Failed to create service',
       }, { status: 500, headers: corsHeaders });
     }
 
-    console.log('[API] Service created:', data);
+    console.log('[Services API] Created:', data);
 
     return NextResponse.json({
       success: true,
@@ -225,7 +233,7 @@ export async function POST(request: NextRequest) {
       message: 'Service created successfully!',
     }, { headers: corsHeaders });
   } catch (error) {
-    console.error('[API] Error:', error);
+    console.error('[Services API] Error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create service',

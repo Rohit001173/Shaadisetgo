@@ -1,74 +1,79 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase-client';
 
+/**
+ * Debug endpoint to check Supabase configuration
+ * GET /api/debug
+ */
 export async function GET() {
-  const results: {
-    environment: Record<string, string>;
-    database: { status: string; error?: string; count?: number };
-    storage: { status: string; error?: string; buckets?: string[] };
-  } = {
-    environment: {},
-    database: { status: 'not_tested' },
-    storage: { status: 'not_tested' },
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Check if all required environment variables are set
+  const config = {
+    supabaseUrl: supabaseUrl ? '✅ Set' : '❌ Missing',
+    supabaseAnonKey: supabaseAnonKey ? '✅ Set' : '❌ Missing',
+    supabaseServiceKey: supabaseServiceKey ? '✅ Set' : '❌ Missing',
+    urlPreview: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'N/A',
   };
 
-  // Check environment variables
-  results.environment = {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'MISSING',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'MISSING',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'MISSING',
-  };
-
-  // Test database connection
-  try {
-    if (!supabaseAdmin) {
-      results.database = { status: 'failed', error: 'supabaseAdmin is null' };
-    } else {
-      const { data, error, count } = await supabaseAdmin
-        .from('services')
-        .select('id', { count: 'exact', head: true });
-
+  // Test Supabase connection
+  let connectionTest = 'Not tested';
+  
+  if (supabaseUrl && (supabaseServiceKey || supabaseAnonKey)) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+      
+      // Try a simple query
+      const { error } = await client.from('vendors').select('id').limit(1);
+      
       if (error) {
-        results.database = { status: 'failed', error: error.message };
+        connectionTest = `❌ Error: ${error.message}`;
       } else {
-        results.database = { status: 'connected', count: count || 0 };
+        connectionTest = '✅ Connected successfully';
       }
+    } catch (err) {
+      connectionTest = `❌ Exception: ${err instanceof Error ? err.message : 'Unknown error'}`;
     }
-  } catch (err) {
-    results.database = { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
+  } else {
+    connectionTest = '❌ Missing credentials';
   }
 
-  // Test storage connection
-  try {
-    if (!supabaseAdmin) {
-      results.storage = { status: 'failed', error: 'supabaseAdmin is null' };
-    } else {
-      // List all buckets
-      const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
-
-      if (listError) {
-        results.storage = { status: 'failed', error: listError.message };
+  // Test storage bucket
+  let storageTest = 'Not tested';
+  
+  if (supabaseUrl && (supabaseServiceKey || supabaseAnonKey)) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+      
+      // Try to list buckets
+      const { data, error } = await client.storage.listBuckets();
+      
+      if (error) {
+        storageTest = `❌ Error: ${error.message}`;
       } else {
-        const bucketNames = buckets?.map(b => b.name) || [];
-        results.storage = {
-          status: 'connected',
-          buckets: bucketNames,
-        };
-
-        // Check if our bucket exists
-        const targetBucket = bucketNames.find(b => b === STORAGE_BUCKET);
-        if (!targetBucket) {
-          results.storage.error = `Bucket '${STORAGE_BUCKET}' not found. Available: ${bucketNames.join(', ')}`;
-        }
+        const bucketNames = data?.map(b => b.name) || [];
+        const hasVendorBucket = bucketNames.includes('Vendor_image');
+        storageTest = hasVendorBucket 
+          ? `✅ Bucket 'Vendor_image' exists` 
+          : `⚠️ Buckets: ${bucketNames.join(', ') || 'none'} - need to create 'Vendor_image'`;
       }
+    } catch (err) {
+      storageTest = `❌ Exception: ${err instanceof Error ? err.message : 'Unknown error'}`;
     }
-  } catch (err) {
-    results.storage = { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
   }
 
   return NextResponse.json({
     success: true,
-    results,
-    bucket_name: STORAGE_BUCKET,
+    timestamp: new Date().toISOString(),
+    config,
+    connectionTest,
+    storageTest,
   });
 }
