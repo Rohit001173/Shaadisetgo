@@ -1096,63 +1096,101 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
   });
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Handle multiple image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setUploading(true);
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('file', files[0]);
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formDataToSend,
-      });
-
-      const data = await response.json();
-      if (data.success && data.url) {
-        setImages([...images, data.url]);
-        toast.success('Image uploaded!');
-      } else {
-        toast.error(data.error || 'Upload failed');
-      }
-    } catch (error) {
-      toast.error('Upload failed');
-    } finally {
-      setUploading(false);
+    // Check if we can add more images
+    if (images.length + files.length > 6) {
+      toast.error('Maximum 6 images allowed');
+      return;
     }
+
+    setUploading(true);
+    setUploadError(null);
+
+    // Upload each file
+    for (const file of Array.from(files)) {
+      try {
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', file);
+
+        console.log('[Admin] Uploading file:', file.name);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formDataToSend,
+        });
+
+        const data = await response.json();
+        console.log('[Admin] Upload response:', data);
+
+        if (data.success && data.url) {
+          setImages(prev => [...prev, data.url]);
+          toast.success(`${file.name} uploaded!`);
+        } else {
+          toast.error(data.error || `Failed to upload ${file.name}`);
+        }
+      } catch (error) {
+        console.error('[Admin] Upload error:', error);
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+
+    setUploading(false);
+    // Reset input
+    e.target.value = '';
+  };
+
+  // Remove image
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!formData.service_name || !formData.category || !formData.city) {
-      toast.error('Please fill all required fields');
+      toast.error('Please fill all required fields (Name, Category, City)');
       return;
     }
 
     setIsSubmitting(true);
+
     try {
+      const payload = {
+        service_name: formData.service_name,
+        category: formData.category,
+        city: formData.city,
+        area: formData.area || null,
+        price: formData.price ? parseInt(formData.price) : null,
+        description: formData.description || null,
+        images: images,
+      };
+
+      console.log('[Admin] Submitting service:', payload);
+
       const response = await fetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          price: formData.price ? parseInt(formData.price) : null,
-          images,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
+      console.log('[Admin] Service response:', data);
+
       if (data.success) {
-        toast.success('Service added successfully!');
+        toast.success('Service added successfully! 🎉');
         setCurrentView('dashboard');
       } else {
         toast.error(data.error || 'Failed to add service');
       }
     } catch (error) {
-      toast.error('Failed to add service');
+      console.error('[Admin] Submit error:', error);
+      toast.error('Failed to add service. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1176,34 +1214,64 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
         {/* Image Upload */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <Label className="mb-2 block">Service Images</Label>
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-base font-semibold">Service Images</Label>
+            <span className="text-sm text-gray-500">{images.length}/6</span>
+          </div>
+
+          {/* Uploaded Images Grid */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             {images.map((img, idx) => (
-              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
                 <img src={img} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => setImages(images.filter((_, i) => i !== idx))}
-                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full"
+                  onClick={() => removeImage(idx)}
+                  className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
+                {idx === 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-[#E8437A] text-white text-xs py-1 text-center">
+                    Primary
+                  </div>
+                )}
               </div>
             ))}
+
+            {/* Upload Button */}
             {images.length < 6 && (
-              <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#E8437A] transition-colors">
+              <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#E8437A] hover:bg-pink-50 transition-all">
                 {uploading ? (
-                  <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
+                  <RefreshCw className="w-6 h-6 text-[#E8437A] animate-spin" />
                 ) : (
                   <>
                     <Upload className="w-6 h-6 text-gray-400" />
                     <span className="text-xs text-gray-400 mt-1">Upload</span>
                   </>
                 )}
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  multiple
+                  disabled={uploading}
+                />
               </label>
             )}
           </div>
+
+          {/* Upload Error */}
+          {uploadError && (
+            <div className="p-2 bg-red-50 rounded-lg text-red-600 text-sm">
+              {uploadError}
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 mt-2">
+            First image will be used as primary. Max 5MB per image.
+          </p>
         </div>
 
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-4">
@@ -1213,6 +1281,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
               value={formData.service_name}
               onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
               placeholder="e.g., DJ Rahul Wedding Services"
+              className="mt-1"
             />
           </div>
 
@@ -1221,7 +1290,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <select
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg bg-background"
+              className="w-full px-3 py-2 border rounded-lg bg-background mt-1"
             >
               {categories.map(cat => (
                 <option key={cat.id} value={cat.name}>{cat.name}</option>
@@ -1236,6 +1305,7 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 placeholder="City"
+                className="mt-1"
               />
             </div>
             <div>
@@ -1244,17 +1314,19 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
                 value={formData.area}
                 onChange={(e) => setFormData({ ...formData, area: e.target.value })}
                 placeholder="Area"
+                className="mt-1"
               />
             </div>
           </div>
 
           <div>
-            <Label>Price</Label>
+            <Label>Starting Price</Label>
             <Input
               type="number"
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               placeholder="e.g., 25000"
+              className="mt-1"
             />
           </div>
 
@@ -1263,18 +1335,29 @@ function AdminAddServicePage({ setCurrentView }: { setCurrentView: (view: any) =
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Service description"
-              rows={3}
+              placeholder="Describe your service..."
+              rows={4}
+              className="mt-1"
             />
           </div>
         </div>
 
         <Button
           type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-[#E8437A] hover:bg-[#d63a6d] py-6"
+          disabled={isSubmitting || uploading}
+          className="w-full bg-[#E8437A] hover:bg-[#d63a6d] py-6 text-lg font-semibold"
         >
-          {isSubmitting ? 'Adding...' : 'Add Service'}
+          {isSubmitting ? (
+            <span className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+              Adding Service...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Add Service
+            </span>
+          )}
         </Button>
       </form>
     </div>

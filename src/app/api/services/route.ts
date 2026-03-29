@@ -1,69 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getServices,
-  createService,
-  isSupabaseConfigured,
-  uploadImage,
-  Service
-} from '@/lib/supabase-client';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase configuration
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const isSupabaseConfigured = supabaseUrl && serviceKey;
+
+const supabaseAdmin = isSupabaseConfigured
+  ? createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : null;
+
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 /**
  * GET /api/services
  * Fetch services with optional filters
- * 
- * Query params:
- * - category: Filter by category
- * - city: Filter by city
- * - search: Search in service_name, category, city
- * - vendor_id: Filter by vendor
- * - limit: Limit number of results
  */
 export async function GET(request: NextRequest) {
   console.log('[API] GET /api/services - Fetching services...');
 
-  // Check Supabase configuration
-  if (!isSupabaseConfigured()) {
-    console.error('[API] Supabase not configured!');
+  if (!supabaseAdmin) {
     return NextResponse.json({
       success: false,
-      error: 'Database not configured. Please check Supabase environment variables.',
+      error: 'Database not configured',
       data: [],
-    }, { status: 500 });
+    }, { headers: corsHeaders });
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    
-    const filters = {
-      category: searchParams.get('category') || undefined,
-      city: searchParams.get('city') || undefined,
-      search: searchParams.get('search') || undefined,
-      vendor_id: searchParams.get('vendor_id') || undefined,
-      limit: parseInt(searchParams.get('limit') || '50'),
-    };
 
-    console.log('[API] Service filters:', filters);
+    let query = supabaseAdmin
+      .from('services')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
-    const services = await getServices(filters);
+    // Apply filters
+    const category = searchParams.get('category');
+    if (category) {
+      query = query.ilike('category', category);
+    }
 
-    console.log(`[API] Returning ${services.length} services`);
+    const city = searchParams.get('city');
+    if (city) {
+      query = query.ilike('city', `%${city}%`);
+    }
+
+    const search = searchParams.get('search');
+    if (search) {
+      query = query.or(`service_name.ilike.%${search}%,category.ilike.%${search}%,city.ilike.%${search}%`);
+    }
+
+    const vendorId = searchParams.get('vendor_id');
+    if (vendorId) {
+      query = query.eq('vendor_id', vendorId);
+    }
+
+    const limit = parseInt(searchParams.get('limit') || '50');
+    query = query.limit(limit);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[API] Query error:', error);
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        data: [],
+      }, { headers: corsHeaders });
+    }
+
+    console.log(`[API] Returning ${data?.length || 0} services`);
 
     return NextResponse.json({
       success: true,
-      data: services,
-      meta: {
-        total: services.length,
-        filters: filters,
-      },
-    });
+      data: data || [],
+    }, { headers: corsHeaders });
   } catch (error) {
-    console.error('[API] Error in GET /api/services:', error);
+    console.error('[API] Error:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to fetch services',
-      message: error instanceof Error ? error.message : 'Unknown error',
       data: [],
-    }, { status: 500 });
+    }, { headers: corsHeaders });
   }
 }
 
@@ -74,81 +106,112 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log('[API] POST /api/services - Creating service...');
 
-  if (!isSupabaseConfigured()) {
-    console.error('[API] Supabase not configured!');
+  if (!supabaseAdmin) {
     return NextResponse.json({
       success: false,
-      error: 'Database not configured. Please check Supabase environment variables.',
-    }, { status: 500 });
+      error: 'Database not configured',
+    }, { status: 500, headers: corsHeaders });
   }
 
   try {
-    const formData = await request.formData();
-    
-    // Extract service data
-    const serviceName = formData.get('service_name') as string || formData.get('serviceName') as string;
-    const category = formData.get('category') as string;
-    const city = formData.get('city') as string;
-    const price = parseInt(formData.get('price') as string) || 0;
-    const description = formData.get('description') as string;
-    const vendorId = formData.get('vendor_id') as string || formData.get('vendorId') as string;
+    const contentType = request.headers.get('content-type') || '';
+
+    let serviceData: Record<string, any> = {};
+
+    // Handle JSON body
+    if (contentType.includes('application/json')) {
+      const body = await request.json();
+      console.log('[API] JSON body:', body);
+
+      serviceData = {
+        service_name: body.service_name || body.serviceName,
+        category: body.category,
+        city: body.city || null,
+        area: body.area || null,
+        price: body.price ? parseInt(body.price) : null,
+        description: body.description || null,
+        image_url: body.images && body.images.length > 0 ? body.images[0] : null,
+        images: body.images || [],
+        vendor_id: body.vendor_id || body.vendorId || null,
+        is_active: true,
+      };
+    } else {
+      // Handle FormData
+      const formData = await request.formData();
+
+      serviceData = {
+        service_name: formData.get('service_name') || formData.get('serviceName'),
+        category: formData.get('category'),
+        city: formData.get('city') || null,
+        area: formData.get('area') || null,
+        price: formData.get('price') ? parseInt(formData.get('price') as string) : null,
+        description: formData.get('description') || null,
+        vendor_id: formData.get('vendor_id') || formData.get('vendorId') || null,
+        is_active: true,
+      };
+
+      // Handle image upload
+      const imageFile = formData.get('image') as File | null;
+      if (imageFile && imageFile.size > 0) {
+        // Upload to storage
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `services/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const arrayBuffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('Vendor_image')
+          .upload(fileName, uint8Array, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: imageFile.type,
+          });
+
+        if (!uploadError) {
+          const { data: urlData } = supabaseAdmin.storage
+            .from('Vendor_image')
+            .getPublicUrl(fileName);
+          serviceData.image_url = urlData.publicUrl;
+        }
+      }
+    }
 
     // Validate required fields
-    if (!serviceName || !category) {
-      console.error('[API] Missing required fields');
+    if (!serviceData.service_name || !serviceData.category) {
       return NextResponse.json({
         success: false,
-        error: 'service_name and category are required',
-      }, { status: 400 });
+        error: 'Service name and category are required',
+      }, { status: 400, headers: corsHeaders });
     }
 
-    console.log('[API] Service data:', { serviceName, category, city, price });
+    console.log('[API] Inserting service:', serviceData);
 
-    // Handle image upload
-    let imageUrl: string | null = null;
-    const imageFile = formData.get('image') as File | null;
-    
-    if (imageFile && imageFile.size > 0) {
-      console.log('[API] Uploading service image...');
-      imageUrl = await uploadImage(imageFile, 'services');
-      console.log('[API] Image uploaded:', imageUrl);
-    }
+    const { data, error } = await supabaseAdmin
+      .from('services')
+      .insert([serviceData])
+      .select()
+      .single();
 
-    // Create service
-    const serviceData: Partial<Service> = {
-      service_name: serviceName,
-      category,
-      city: city || null,
-      price,
-      description: description || null,
-      image_url: imageUrl,
-      vendor_id: vendorId || null,
-      is_active: true,
-    };
-
-    const service = await createService(serviceData);
-
-    if (!service) {
-      console.error('[API] Failed to create service');
+    if (error) {
+      console.error('[API] Insert error:', error);
       return NextResponse.json({
         success: false,
-        error: 'Failed to create service. Please try again.',
-      }, { status: 500 });
+        error: error.message || 'Failed to create service',
+      }, { status: 500, headers: corsHeaders });
     }
 
-    console.log('[API] Service created successfully:', service.id);
+    console.log('[API] Service created:', data);
 
     return NextResponse.json({
       success: true,
-      data: service,
+      data: data,
       message: 'Service created successfully!',
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
-    console.error('[API] Error in POST /api/services:', error);
+    console.error('[API] Error:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to create service',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }, { status: 500 });
+      error: error instanceof Error ? error.message : 'Failed to create service',
+    }, { status: 500, headers: corsHeaders });
   }
 }
